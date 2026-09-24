@@ -39,7 +39,7 @@ type ButtonProps = { trackingId?: string | null; className?: string; children?: 
  * Opens WhatsApp with a prefilled message. When no number is configured it
  * explains that and offers Customer Support instead of a dead link.
  */
-export function WhatsAppSupportButton({ trackingId, className = 'dhl-secondary-button', children }: ButtonProps) {
+export function WhatsAppSupportButton({ trackingId, className = 'dhl-whatsapp-action', children }: ButtonProps) {
   const whatsapp = useWhatsAppSupport();
   const [unavailableOpen, setUnavailableOpen] = useState(false);
   const href = whatsapp.linkFor(trackingId);

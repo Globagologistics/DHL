@@ -6,6 +6,8 @@ type Props = Omit<InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange' | 
   /** Raw digits (0–12). The field shows them grouped as 1234 5678 9012. */
   value: string;
   onValueChange: (digits: string) => void;
+  /** Called when a typed character is refused (letters, symbols). Pasted text is cleaned silently. */
+  onRejectedInput?: () => void;
 };
 
 /** Caret index in the formatted string after `digitCount` digits. */
@@ -23,7 +25,7 @@ function caretForDigits(formatted: string, digitCount: number) {
  * Digits-only tracking field: numeric keypad on phones, at most 12 digits,
  * pasted text is cleaned, and the caret stays put while spaces are inserted.
  */
-export const TrackingNumberInput = forwardRef<HTMLInputElement, Props>(function TrackingNumberInput({ value, onValueChange, ...rest }, forwardedRef) {
+export const TrackingNumberInput = forwardRef<HTMLInputElement, Props>(function TrackingNumberInput({ value, onValueChange, onRejectedInput, ...rest }, forwardedRef) {
   const input = useRef<HTMLInputElement>(null);
   const pendingCaret = useRef<number | null>(null);
   useImperativeHandle(forwardedRef, () => input.current as HTMLInputElement);
@@ -39,6 +41,8 @@ export const TrackingNumberInput = forwardRef<HTMLInputElement, Props>(function 
 
   const handleChange = (event: ChangeEvent<HTMLInputElement>) => {
     const field = event.target;
+    const native = event.nativeEvent as InputEvent;
+    if (native.inputType === 'insertText' && native.data && /[^\d\s-]/.test(native.data)) onRejectedInput?.();
     const beforeCaret = field.value.slice(0, field.selectionStart ?? field.value.length);
     pendingCaret.current = Math.min(beforeCaret.replace(/\D/g, '').length, TRACKING_NUMBER_LENGTH);
     onValueChange(normalizeTrackingInput(field.value));

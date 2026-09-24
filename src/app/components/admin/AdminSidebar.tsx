@@ -21,12 +21,17 @@ const navigation = [
 export default function AdminSidebar({ onNavigate, onClose, compact = false }: Props) {
   const location = useLocation();
   const [profileOpen, setProfileOpen] = useState(false);
-  const activeFor = (to: string, exact?: boolean) => exact ? location.pathname === to : location.pathname === to || location.pathname.startsWith(to + '/');
+  // Exactly one item is active: Create Shipment owns /admin/shipments/new, Shipments owns the rest.
+  const activeFor = (to: string, exact?: boolean) => {
+    if (exact) return location.pathname === to;
+    if (to === '/admin/shipments' && location.pathname === '/admin/shipments/new') return false;
+    return location.pathname === to || location.pathname.startsWith(to + '/');
+  };
   return <aside className={`dhl-admin-sidebar${compact ? ' compact' : ''}`} aria-label="Admin navigation">
     <div className="dhl-admin-brand"><Link to="/admin" onClick={onNavigate} aria-label="DHL Admin Dashboard"><img src={brandConfig.cinematicLogo} alt="DHL Express" /></Link>{onClose && <button type="button" onClick={onClose} aria-label="Close admin navigation"><X size={20} /></button>}</div>
     <div className="dhl-admin-sidebar-intro"><span>OPERATIONS CONSOLE</span><strong>Command center</strong></div>
     <nav className="dhl-admin-navigation">
-      {navigation.map(({ label, to, icon: Icon, exact }) => <NavLink key={to} to={to} onClick={onNavigate} className={activeFor(to, exact) ? 'active' : ''} title={label}><Icon size={18} strokeWidth={1.9} aria-hidden="true" /><span>{label}</span></NavLink>)}
+      {navigation.map(({ label, to, icon: Icon, exact }) => <NavLink key={to} to={to} onClick={onNavigate} className={() => activeFor(to, exact) ? 'active' : ''} aria-current={activeFor(to, exact) ? 'page' : undefined} title={label}><Icon size={18} strokeWidth={1.9} aria-hidden="true" /><span>{label}</span></NavLink>)}
     </nav>
     <div className="dhl-admin-sidebar-bottom">
       <Link className="dhl-admin-sidebar-help" to="/admin/settings" onClick={onNavigate}><CircleHelp size={18} /><span>Help & settings</span></Link>

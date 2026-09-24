@@ -5,6 +5,14 @@
 .dhl-admin-button.danger { border-color: #f1c2c5; background: #fff5f5; color: var(--admin-red); }
 .dhl-admin-button.danger:hover { background: #ffe9ea; }
 .dhl-admin-button:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+.dhl-admin-button.whatsapp { border-color: #1fbf5b; background: #25d366; color: #062711; }
+.dhl-admin-button.whatsapp:hover { background: #1fbf5b; }
+.dhl-admin-demo-badge { margin-left: 7px; padding: 2px 6px; border-radius: 5px; background: #fff5d9; color: #8a6100; font-size: 9px; font-style: normal; font-weight: 850; letter-spacing: .08em; vertical-align: 1px; }
+.dhl-admin-public-identity .demo { color: #8a6100; }
+
+/* Sticky top bar: stays put while the admin content scrolls. Drawer (80) and modals (100) stay above it. */
+.dhl-admin-topbar { position: sticky; top: 0; z-index: 40; }
+.dhl-admin-sidebar-desktop { position: sticky; top: 0; align-self: flex-start; height: 100dvh; }
 .dhl-admin-segmented { display: inline-flex; flex-wrap: wrap; gap: 3px; margin: 0 0 16px; padding: 3px; border: 1px solid var(--admin-border); border-radius: 11px; background: #f6f7f8; }
 .dhl-admin-segmented button { min-height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: transparent; color: var(--admin-muted); font-size: 12px; font-weight: 800; cursor: pointer; }
 .dhl-admin-segmented button.active { background: #fff; color: var(--admin-text); box-shadow: 0 1px 4px rgba(0, 0, 0, .08); }

@@ -30,7 +30,7 @@ export function WhatsAppSection() {
       <div><strong>Try it</strong><small>{issue ? issue : 'Opens WhatsApp in a new tab using the values above (saved or not).'}</small></div>
       <div className="dhl-settings-inline-actions">
         {testLink ? <a className="dhl-admin-button" href={testLink} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />Test WhatsApp Link</a> : <button type="button" className="dhl-admin-button" disabled><ExternalLink size={15} />Test WhatsApp Link</button>}
-        {openLink ? <a className="dhl-admin-button" href={openLink} target="_blank" rel="noopener noreferrer"><WhatsAppIcon size={15} />Open WhatsApp</a> : <button type="button" className="dhl-admin-button" disabled><WhatsAppIcon size={15} />Open WhatsApp</button>}
+        {openLink ? <a className="dhl-admin-button whatsapp" href={openLink} target="_blank" rel="noopener noreferrer"><WhatsAppIcon size={15} />Open WhatsApp</a> : <button type="button" className="dhl-admin-button whatsapp" disabled><WhatsAppIcon size={15} />Open WhatsApp</button>}
       </div>
     </div>
     <SaveBar dirty={form.dirty} saving={form.saving} disabled={!form.record?.writable || Boolean(issue)} disabledReason={!form.record?.writable ? 'Settings storage is created during deployment (app_settings migration).' : issue || undefined} onSave={() => void form.submit('WhatsApp settings saved. Customer buttons now use this number.')} onReset={form.reset} feedback={form.feedback} />

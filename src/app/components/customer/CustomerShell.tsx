@@ -44,7 +44,8 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
     }
   };
   const isWelcome = location.pathname === '/';
-  const special = isWelcome || location.pathname === '/chat';
+  // The floating Support button would only link to the page already open.
+  const hideFloatingSupport = isWelcome || location.pathname === '/chat';
   const isHome = location.pathname === '/home';
   useEffect(() => setDrawerOpen(false), [location.pathname]);
   useEffect(() => {
@@ -54,14 +55,15 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', onEscape);
   }, [drawerOpen]);
   return <div className={`dhl-app${isHome ? ' dhl-app-home' : ''}`}>
-    {/* Customer header: menu and logo only. Notifications, settings and developer controls stay out of it. */}
-    {!special && <header className="dhl-header"><div className="dhl-header-inner dhl-header-minimal">
+    {/* Sticky customer header: menu and logo only. Notifications, settings and developer controls stay out of it.
+        Customer Support keeps it; the open conversation hides it through CSS (:has(.dhl-chat-shell)). */}
+    {!isWelcome && <header className="dhl-header"><div className="dhl-header-inner dhl-header-minimal">
       <button className="dhl-icon-button dhl-menu-button" onClick={() => setDrawerOpen(true)} aria-label="Open navigation"><Menu size={22}/></button>
       <BrandLogo unboxed={isHome}/>
       <span className="dhl-header-balance" aria-hidden="true"/>
     </div></header>}
-    <main className={special ? 'dhl-main dhl-main-special' : 'dhl-main'}>{children}</main>
-    {!special && <button className="dhl-floating-support" onClick={() => navigate('/chat')} aria-label="Customer support"><Headphones size={20}/><span>Support</span></button>}
+    <main className={isWelcome ? 'dhl-main dhl-main-special' : 'dhl-main'}>{children}</main>
+    {!hideFloatingSupport && <button className="dhl-floating-support" onClick={() => navigate('/chat')} aria-label="Customer support"><Headphones size={20}/><span>Support</span></button>}
     {!isWelcome &&
       <nav className="dhl-bottom-nav" aria-label="Mobile navigation">
         <Link className={location.pathname === '/home' ? 'active' : ''} to="/home"><Home size={22}/><span>Home</span></Link>
@@ -96,6 +98,7 @@ export function PageHeading({ title, backTo, eyebrow }: { title: string; backTo?
 export function TrackingForm({ compact = false }: { compact?: boolean }) {
   const [digits, setDigits] = useState('');
   const [incomplete, setIncomplete] = useState(false);
+  const [charWarning, setCharWarning] = useState(false);
   const navigate = useNavigate();
   const fieldId = useId();
   const timer = useRef<number | null>(null);
@@ -103,16 +106,17 @@ export function TrackingForm({ compact = false }: { compact?: boolean }) {
   useEffect(() => clearTimer, []);
   const open = (value: string) => { clearTimer(); navigate(`/track?id=${value}`); };
   const change = (value: string) => {
+    if (value !== digits) setCharWarning(false);
     setDigits(value);
     setIncomplete(false);
     clearTimer();
     if (value.length === TRACKING_NUMBER_LENGTH) timer.current = window.setTimeout(() => open(value), AUTO_LOOKUP_DEBOUNCE_MS);
   };
-  const helper = incomplete ? 'Enter the complete 12-digit tracking number.' : digits.length === TRACKING_NUMBER_LENGTH ? 'Searching…' : digits ? 'Tracking numbers contain 12 digits.' : '';
+  const helper = charWarning ? 'Tracking numbers can contain numbers only.' : incomplete ? 'Enter the complete 12-digit tracking number.' : digits.length === TRACKING_NUMBER_LENGTH ? 'Searching…' : digits ? 'Tracking numbers contain 12 digits.' : '';
   return <form className={`dhl-tracking-form ${compact ? 'compact' : ''}`} noValidate onSubmit={event => { event.preventDefault(); if (digits.length === TRACKING_NUMBER_LENGTH) open(digits); else setIncomplete(true); }}>
-    <label className={`dhl-tracking-field${incomplete ? ' invalid' : ''}`} htmlFor={fieldId}><Search size={19} aria-hidden="true"/><TrackingNumberInput id={fieldId} value={digits} onValueChange={change} placeholder="Enter 12-digit tracking number" aria-label="Tracking number" aria-describedby={`${fieldId}-helper`} aria-invalid={incomplete}/></label>
+    <label className={`dhl-tracking-field${incomplete || charWarning ? ' invalid' : ''}`} htmlFor={fieldId}><Search size={19} aria-hidden="true"/><TrackingNumberInput id={fieldId} value={digits} onValueChange={change} onRejectedInput={() => setCharWarning(true)} placeholder="Enter 12-digit tracking number" aria-label="Tracking number" aria-describedby={`${fieldId}-helper`} aria-invalid={incomplete}/></label>
     <button className="dhl-primary-button" type="submit">Track Shipment <ChevronRight size={18}/></button>
-    <p id={`${fieldId}-helper`} className={`dhl-tracking-helper${incomplete ? ' error' : ''}`} role={incomplete ? 'alert' : undefined} aria-live="polite">{helper}</p>
+    <p id={`${fieldId}-helper`} className={`dhl-tracking-helper${incomplete || charWarning ? ' error' : ''}`} role={incomplete || charWarning ? 'alert' : undefined} aria-live="polite">{helper}</p>
   </form>;
 }
 
