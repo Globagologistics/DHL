@@ -1,5 +1,7 @@
 # Admin rebuild: backend handoff
 
+> **Superseded in part.** The wizard now collects company, structured addresses, shipment type, pieces, weight, dimensions and reference (stored in `shipment_details` after migration `20260925000001`). Customers track by a 12-digit `tracking_number` (migration `20260925000000`), and the Notification Center has a manual send composer backed by `netlify/functions/admin-settings.ts`. The deployment checklist lives in [`docs/phase-2-deployment.md`](../phase-2-deployment.md).
+
 The rebuilt admin UI uses the existing authenticated shipment, checkpoint, chat, notification-delivery, and storage services. No remote database changes were applied during this UI pass.
 
 ## Required before enabling public shipment requests
