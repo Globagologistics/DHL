@@ -1,56 +1,21 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Bell, Mail, MessageCircle, RefreshCw, Send, Truck, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
-type Delivery = {
-  id: string;
-  tracking_id: string;
-  recipient_email: string;
-  recipient_type: string;
-  notification_type: string;
-  delivery_status: string;
-  attempt_count: number;
-  sent_at: string | null;
-  error_summary: string | null;
-  created_at: string;
-};
-
-const maskEmail = (email: string) => {
-  const [name, domain] = email.split('@');
-  return domain ? `${name.slice(0, 2)}${name.length > 2 ? '***' : ''}@${domain}` : 'Unavailable';
-};
+type Delivery = {id:string;tracking_id:string;recipient_email:string;recipient_type:string;notification_type:string;delivery_status:string;attempt_count:number;sent_at:string|null;error_summary:string|null;created_at:string};
+type Tab = 'all'|'shipment'|'message'|'system';
+const maskEmail = (email:string) => {const [name,domain]=email.split('@');return domain?`${name.slice(0,2)}${name.length>2?'***':''}@${domain}`:'Unavailable';};
+const category = (kind:string):Tab => kind.includes('chat')?'message':kind.includes('shipment')||kind.includes('delivered')||kind.includes('hold')||kind.includes('payment')?'shipment':'system';
 
 export default function AdminNotifications() {
-  const [deliveries, setDeliveries] = useState<Delivery[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    const { data, error } = await supabase
-      .from('notification_deliveries')
-      .select('id, tracking_id, recipient_email, recipient_type, notification_type, delivery_status, attempt_count, sent_at, error_summary, created_at')
-      .order('created_at', { ascending: false })
-      .limit(100);
-    if (error) setMessage('Unable to load notification delivery records.');
-    else setDeliveries((data || []) as Delivery[]);
-    setLoading(false);
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const retry = async (id: string) => {
-    setMessage(null);
-    const { data, error } = await supabase.rpc('retry_notification_delivery', { p_delivery_id: id });
-    if (error || !data) setMessage('This delivery could not be queued for retry.');
-    else {
-      setMessage('Retry queued. The scheduled notification worker will perform the send.');
-      void load();
-    }
-  };
-
-  return <div className="min-h-screen bg-gray-50 p-6"><div className="mx-auto max-w-6xl">
-    <div className="mb-6 flex items-center justify-between gap-4"><div><h1 className="text-2xl font-bold text-gray-900">Notification Deliveries</h1><p className="text-sm text-gray-600">Latest 100 outbox delivery attempts. Recipient addresses are masked.</p></div><button onClick={() => void load()} className="rounded bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Refresh</button></div>
-    {message && <div className="mb-4 rounded border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{message}</div>}
-    <div className="overflow-x-auto rounded-lg bg-white shadow"><table className="min-w-full text-left text-sm"><thead className="bg-slate-100 text-slate-700"><tr><th className="p-3">Tracking</th><th className="p-3">Type</th><th className="p-3">Recipient</th><th className="p-3">State</th><th className="p-3">Attempts</th><th className="p-3">Sent</th><th className="p-3">Error</th><th className="p-3" /></tr></thead><tbody>{loading ? <tr><td className="p-4" colSpan={8}>Loading…</td></tr> : deliveries.map((delivery) => <tr key={delivery.id} className="border-t"><td className="p-3 font-mono text-xs">{delivery.tracking_id}</td><td className="p-3">{delivery.notification_type.replace(/_/g, ' ')}</td><td className="p-3">{delivery.recipient_type} · {maskEmail(delivery.recipient_email)}</td><td className="p-3">{delivery.delivery_status}</td><td className="p-3">{delivery.attempt_count}</td><td className="p-3">{delivery.sent_at ? new Date(delivery.sent_at).toLocaleString() : '—'}</td><td className="p-3 text-red-700">{delivery.error_summary || '—'}</td><td className="p-3">{delivery.delivery_status === 'failed' && <button onClick={() => void retry(delivery.id)} className="rounded bg-amber-600 px-3 py-1 text-xs font-semibold text-white">Retry Email</button>}</td></tr>)}</tbody></table></div>
-  </div></div>;
+  const [deliveries,setDeliveries]=useState<Delivery[]>([]);
+  const [loading,setLoading]=useState(true);
+  const [message,setMessage]=useState('');
+  const [tab,setTab]=useState<Tab>('all');
+  const [composeOpen,setComposeOpen]=useState(false);
+  const load=useCallback(async()=>{setLoading(true);const {data,error}=await supabase.from('notification_deliveries').select('id,tracking_id,recipient_email,recipient_type,notification_type,delivery_status,attempt_count,sent_at,error_summary,created_at').order('created_at',{ascending:false}).limit(100);if(error)setMessage('Unable to load notification delivery records.');else{setDeliveries((data||[]) as Delivery[]);setMessage('');}setLoading(false);},[]);
+  useEffect(()=>{void load();},[load]);
+  const retry=async(id:string)=>{const {data,error}=await supabase.rpc('retry_notification_delivery',{p_delivery_id:id});if(error||!data)setMessage('This delivery could not be queued for retry.');else{setMessage('Retry queued. The scheduled notification worker will perform the send.');void load();}};
+  const visible=useMemo(()=>deliveries.filter(delivery=>tab==='all'||category(delivery.notification_type)===tab),[deliveries,tab]);
+  return <div className="dhl-admin-notifications"><div className="dhl-admin-page-head"><div><span className="dhl-admin-eyebrow">COMMUNICATIONS</span><h1>Notification Center</h1><p>Monitor customer updates and delivery attempts.</p></div><div className="dhl-admin-page-actions"><button type="button" className="dhl-admin-button" onClick={()=>void load()}><RefreshCw size={16}/> Refresh</button><button type="button" className="dhl-admin-button primary" onClick={()=>setComposeOpen(true)}><Send size={16}/> Send Notification</button></div></div>{message&&<p className="dhl-admin-banner" role="status">{message}</p>}<section className="dhl-admin-card"><div className="dhl-admin-tabs shipment-tabs" role="tablist" aria-label="Notification category">{([['all','All'],['shipment','Shipment Updates'],['message','Customer Messages'],['system','System']] as [Tab,string][]).map(([value,label])=><button key={value} type="button" role="tab" aria-selected={tab===value} className={tab===value?'active':''} onClick={()=>setTab(value)}>{label}</button>)}</div>{loading?<div className="dhl-admin-empty"><Bell size={23}/><strong>Loading deliveries...</strong></div>:visible.length?<div className="dhl-admin-notification-list">{visible.map(delivery=>{const kind=category(delivery.notification_type);const Icon=kind==='message'?MessageCircle:kind==='shipment'?Truck:Mail;return <article key={delivery.id}><span className={`dhl-admin-notification-icon ${kind}`}><Icon size={18}/></span><div><strong>{delivery.notification_type.replaceAll('_',' ').replace(/\b\w/g,letter=>letter.toUpperCase())}</strong><p>{delivery.recipient_type} · {maskEmail(delivery.recipient_email)} · {delivery.tracking_id.slice(0,13)}</p>{delivery.error_summary&&<small className="error">{delivery.error_summary}</small>}</div><div className="dhl-admin-notification-tail"><span className={`dhl-admin-status ${delivery.delivery_status==='sent'?'delivered':delivery.delivery_status==='failed'?'alert':'pending'}`}>{delivery.delivery_status}</span><time>{new Date(delivery.sent_at||delivery.created_at).toLocaleString()}</time>{delivery.delivery_status==='failed'&&<button type="button" onClick={()=>void retry(delivery.id)}>Retry delivery</button>}</div></article>;})}</div>:<div className="dhl-admin-empty"><Bell size={24}/><strong>No notifications in this category</strong><span>Delivery activity will appear when events are queued.</span></div>}</section>{composeOpen&&<div className="dhl-admin-modal-layer" onMouseDown={event=>{if(event.target===event.currentTarget)setComposeOpen(false);}}><section className="dhl-admin-compose" role="dialog" aria-modal="true" aria-label="Send notification"><div><h2>Send Notification</h2><button type="button" onClick={()=>setComposeOpen(false)} aria-label="Close"><X size={20}/></button></div><p>The current notification service sends lifecycle updates and supports retries. Manual customer messages require a server-side send endpoint and are not enabled yet.</p><label>Shipment / tracking number<input placeholder="Select a shipment" disabled/></label><label>Customer<input placeholder="Select a customer" disabled/></label><label>Message<textarea placeholder="Compose your message" disabled/></label><button type="button" className="dhl-admin-button" onClick={()=>setComposeOpen(false)}>Close</button></section></div>}</div>;
 }

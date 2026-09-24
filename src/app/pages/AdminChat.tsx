@@ -1,216 +1,24 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { Menu, MessageSquare } from "lucide-react";
-import { ChatThread } from "../components/chat/ChatThread";
-import { cn } from "../components/ui/utils";
-import { markThreadRead, useChatThreads } from "../../hooks/useChat";
+import { useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { ArrowLeft, ChevronRight, Headphones, Info, MapPin, MessageCircle, Package, Search } from 'lucide-react';
+import { markThreadRead, sendChatMessage, useChatMessages, useChatThreads } from '../../hooks/useChat';
+import { useShipmentWithCheckpoints } from '../../hooks/useSupabase';
+import type { ChatMessage, ChatThreadSummary } from '../../types/chat';
+import { AdminContext } from '../contexts/AdminContext';
+import { environment } from '../../config/environment';
+import { activeSupportAgent } from '../../config/supportAgents';
+import { ChatComposer } from '../components/chat/ChatComposer';
+import { ReplyableMessage } from '../components/chat/ReplyableMessage';
 
-export default function AdminChat() {
-  const { threads, loading } = useChatThreads();
-
-  const sortedThreads = useMemo(() => {
-    return [...threads].sort(
-      (a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)
-    );
-  }, [threads]);
-
-  const [selectedThreadId, setSelectedThreadId] = useState<string | null>(
-    sortedThreads[0]?.id ?? null
-  );
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-
-  useEffect(() => {
-    if (selectedThreadId) return;
-    if (sortedThreads[0]) {
-      setSelectedThreadId(sortedThreads[0].id);
-    }
-  }, [sortedThreads, selectedThreadId]);
-
-  const handleSelect = (threadId: string) => {
-    setSelectedThreadId(threadId);
-    markThreadRead(threadId, "admin");
-    setSidebarOpen(false);
-  };
-
-  return (
-    <div className="relative h-[100dvh] w-full overflow-hidden bg-[#0B0F1A] text-white">
-      <div className="absolute inset-0 bg-[url('https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-background-cool-dark-green-new-theme-whatsapp.jpg')] bg-cover bg-center opacity-15" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(3,7,18,0.95)_0%,rgba(3,7,18,0.9)_45%,rgba(3,7,18,0.6)_70%,rgba(3,7,18,0.3)_100%)]" />
-      <div className="relative z-10 flex h-full">
-        {/* Desktop Sidebar */}
-        <aside className="hidden h-full w-[30%] max-w-sm border-r border-white/10 bg-black/40 backdrop-blur-xl md:flex md:flex-col">
-          <div className="px-6 py-5">
-            <div className="text-xl font-black tracking-tighter">
-              Active Tracking IDs
-            </div>
-            <p className="mt-1 text-xs uppercase tracking-[0.3em] text-white/50">
-              Command Center
-            </p>
-          </div>
-          <div className="flex-1 overflow-y-auto px-4 pb-6">
-            {loading ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
-                Loading chats...
-              </div>
-            ) : sortedThreads.length === 0 ? (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
-                No active chats yet.
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sortedThreads.map((thread) => {
-                  const snippet =
-                    thread.lastMessagePreview || "No messages yet";
-                  const isActive = thread.id === selectedThreadId;
-
-                  return (
-                    <button
-                      key={thread.id}
-                      type="button"
-                      onClick={() => handleSelect(thread.id)}
-                      className={cn(
-                        "w-full rounded-2xl border px-4 py-3 text-left transition",
-                        isActive
-                          ? "border-white/30 bg-white/15"
-                          : "border-white/10 bg-white/5 hover:bg-white/10"
-                      )}
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-white">
-                          {thread.trackingId}
-                        </span>
-                        {thread.unreadForAdmin > 0 && (
-                          <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-                            New
-                          </span>
-                        )}
-                      </div>
-                      <p className="mt-1 truncate text-xs text-white/60">
-                        {snippet}
-                      </p>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </aside>
-
-        {/* Main Chat Area */}
-        <main className="relative flex h-full min-h-0 flex-1 flex-col">
-          {/* Mobile Header */}
-          <div className="flex items-center justify-between border-b border-white/10 bg-black/40 px-5 py-4 backdrop-blur-xl md:hidden">
-            <button
-              type="button"
-              onClick={() => setSidebarOpen(true)}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/70"
-              aria-label="Open chats"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-            <div className="text-sm font-semibold uppercase tracking-[0.3em] text-white/60">
-              Admin
-            </div>
-            <div className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5">
-              <MessageSquare className="h-4 w-4 text-white/50" />
-            </div>
-          </div>
-
-          {selectedThreadId ? (
-            <ChatThread
-              trackingId={sortedThreads.find((thread) => thread.id === selectedThreadId)?.trackingId || ''}
-              threadId={selectedThreadId}
-              role="admin"
-              title="Admin Command Center"
-              subtitle="Live shipment support"
-              headerAction={
-                <button
-                  type="button"
-                  onClick={() => setSidebarOpen(true)}
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/70 md:hidden"
-                  aria-label="Open tracking list"
-                >
-                  <Menu className="h-5 w-5" />
-                </button>
-              }
-              accentClassName="bg-[#2563EB]"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center px-6">
-              <div className="rounded-3xl border border-white/10 bg-white/5 p-10 text-center">
-                <h2 className="text-2xl font-black tracking-tighter">
-                  No Active Chat
-                </h2>
-                <p className="mt-3 text-sm text-white/60">
-                  Waiting for a tracking ID to start a conversation.
-                </p>
-              </div>
-            </div>
-          )}
-        </main>
-      </div>
-
-      {/* Mobile Sidebar */}
-      <div
-        className={cn(
-          "fixed inset-0 z-40 bg-black/60 backdrop-blur-sm transition-opacity md:hidden",
-          sidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"
-        )}
-        onClick={() => setSidebarOpen(false)}
-      />
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[85%] max-w-xs border-r border-white/10 bg-[#0B0F1A]/95 p-5 transition-transform md:hidden",
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        )}
-      >
-        <div className="mb-6">
-          <div className="text-lg font-black tracking-tighter">
-            Active Tracking IDs
-          </div>
-          <p className="mt-1 text-xs uppercase tracking-[0.3em] text-white/50">
-            Command Center
-          </p>
-        </div>
-        <div className="space-y-3 overflow-y-auto">
-          {loading ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
-              Loading chats...
-            </div>
-          ) : sortedThreads.length === 0 ? (
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
-              No active chats yet.
-            </div>
-          ) : (
-            sortedThreads.map((thread) => {
-              const snippet =
-                thread.lastMessagePreview || "No messages yet";
-
-              return (
-                <button
-                  key={thread.id}
-                  type="button"
-                  onClick={() => handleSelect(thread.id)}
-                  className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left hover:bg-white/10"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-white">
-                      {thread.trackingId}
-                    </span>
-                    {thread.unreadForAdmin > 0 && (
-                      <span className="rounded-full bg-emerald-400/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.2em] text-emerald-200">
-                        New
-                      </span>
-                    )}
-                  </div>
-                  <p className="mt-1 truncate text-xs text-white/60">
-                    {snippet}
-                  </p>
-                </button>
-              );
-            })
-          )}
-        </div>
-      </aside>
-    </div>
-  );
+function Conversation({thread,onBack,onInfo}:{thread:ChatThreadSummary;onBack:()=>void;onInfo:()=>void}) {
+  const {messages,loading}=useChatMessages(thread.trackingId,thread.id); const [replyTo,setReplyTo]=useState<ChatMessage|null>(null);const [following,setFollowing]=useState(true);const [newCount,setNewCount]=useState(0);const bottom=useRef<HTMLDivElement>(null);const scroller=useRef<HTMLDivElement>(null);const agent=activeSupportAgent();const bypass=environment.devAdminBypass;
+  useEffect(()=>{void markThreadRead(thread.id,'admin');},[thread.id,messages.length]);
+  useEffect(()=>{if(following)bottom.current?.scrollIntoView({block:'end'});else if(messages.length)setNewCount(count=>count+1);},[messages.length]);
+  const onScroll=()=>{const area=scroller.current;if(!area)return;const near=area.scrollHeight-area.scrollTop-area.clientHeight<88;setFollowing(near);if(near)setNewCount(0);};const latest=()=>{setFollowing(true);setNewCount(0);bottom.current?.scrollIntoView({behavior:'smooth',block:'end'});};
+  const send=async(text:string,file:File|null,reply:ChatMessage|null)=>{if(bypass)return 'Authentication required for this operation.';const result=await sendChatMessage({trackingId:thread.trackingId,threadId:thread.id,sender:'admin',text,mediaFiles:file?[file]:[],replyToMessageId:reply?.id,supportProfileId:agent.id,senderName:agent.name,senderAvatarUrl:agent.avatar});return result.error?'Message could not be sent. Please try again.':null;};
+  return <section className="dhl-admin-chat-conversation" aria-label="Support conversation"><header><button type="button" className="dhl-admin-chat-back" aria-label="Back to inbox" onClick={onBack}><ArrowLeft size={20}/></button><img className="dhl-admin-chat-avatar" src={agent.avatar} alt=""/><div><strong>{agent.name}</strong><small><i/> DHL Shipment Support · {thread.trackingId.slice(0,13)}</small></div><button type="button" className="dhl-admin-chat-info" aria-label="Shipment information" onClick={onInfo}><Info size={20}/></button></header><div ref={scroller} onScroll={onScroll} className="dhl-admin-chat-messages" role="log" aria-live="polite">{loading&&<p className="dhl-admin-chat-notice">Loading conversation...</p>}{!loading&&!messages.length&&<p className="dhl-admin-chat-notice">No messages yet. Start the conversation below.</p>}{messages.map(message=><ReplyableMessage key={message.id} message={message} activeRole="admin" onReply={setReplyTo} className="dhl-admin-chat-message" avatarClassName="dhl-admin-chat-customer-avatar" compact/>)}<div ref={bottom}/></div>{newCount>0&&<button type="button" className="dhl-chat-new-message admin" onClick={latest}>New message ↓</button>}<div className="dhl-admin-public-identity">Responding publicly as: <strong>{agent.name}</strong>{bypass&&<span>Authentication required to send</span>}</div><ChatComposer className="dhl-admin-chat-composer" replyTo={replyTo} onCancelReply={()=>setReplyTo(null)} disabled={bypass} onSend={send} placeholder="Type your reply…"/></section>;
 }
+
+function ShipmentContext({thread,onClose}:{thread:ChatThreadSummary;onClose:()=>void}) { const {shipment,loading}=useShipmentWithCheckpoints(thread.trackingId);const latest=[...(shipment?.checkpoints||[])].filter(item=>item.status!=='pending').sort((a,b)=>b.checkpoint_order-a.checkpoint_order)[0];return <aside className="dhl-admin-chat-context"><div className="dhl-admin-chat-context-head"><span>SHIPMENT CONTEXT</span><button type="button" onClick={onClose} aria-label="Close shipment information"><ArrowLeft size={17}/></button></div><div className="dhl-admin-chat-context-body"><span className="dhl-admin-chat-context-icon"><Package size={22}/></span><h2>{thread.trackingId.slice(0,13).toUpperCase()}</h2><p>{loading?'Loading shipment...':shipment?.package_name||'Shipment record unavailable'}</p>{shipment?<><span className="dhl-admin-status transit">{shipment.status.replaceAll('_',' ')}</span><dl><div><dt>Recipient</dt><dd>{shipment.receiver_name}</dd></div><div><dt>Destination</dt><dd>{shipment.delivery_address}</dd></div><div><dt>Transport</dt><dd>{shipment.transportation}</dd></div><div><dt>Estimated delivery</dt><dd>{shipment.estimated_delivery_at?new Date(shipment.estimated_delivery_at).toLocaleDateString():'Not provided'}</dd></div><div><dt>Latest checkpoint</dt><dd>{latest?.location||'No checkpoint recorded'}</dd></div></dl><div className="dhl-admin-chat-route"><MapPin size={17}/><span>{shipment.pickup_location||'Origin'}<br/><strong>{shipment.delivery_address}</strong></span></div><Link className="dhl-admin-button" to={`/admin/shipments/${shipment.id}`}>View Shipment <ChevronRight size={16}/></Link></>:<p className="dhl-admin-chat-context-missing">No shipment details could be loaded for this conversation.</p>}</div></aside>; }
+
+export default function AdminChat(){const {shipments}=useContext(AdminContext);const {threads,loading}=useChatThreads();const {threadId}=useParams<{threadId:string}>();const [params]=useSearchParams();const navigate=useNavigate();const [query,setQuery]=useState('');const [filter,setFilter]=useState<'all'|'unread'>('all');const [infoOpen,setInfoOpen]=useState(false);const ordered=useMemo(()=>[...threads].sort((a,b)=>(b.lastMessageAt||0)-(a.lastMessageAt||0)),[threads]);const selected=ordered.find(item=>item.id===threadId)||ordered.find(item=>item.trackingId===params.get('tracking'))||ordered[0];const shipmentById=useMemo(()=>new Map(shipments.map(item=>[item.id,item])),[shipments]);const list=ordered.filter(item=>{const shipment=shipmentById.get(item.trackingId);return(filter==='all'||item.unreadForAdmin>0)&&[item.trackingId,item.lastMessagePreview,shipment?.senderName,shipment?.receiverName].join(' ').toLowerCase().includes(query.toLowerCase());});const showConversation=Boolean(threadId||params.get('tracking'));return <div className="dhl-admin-chat-page"><div className="dhl-admin-page-head"><div><span className="dhl-admin-eyebrow">CUSTOMER OPERATIONS</span><h1>Support & Chat</h1><p>Resolve shipment questions with live conversation and context.</p></div><span className="dhl-admin-chat-live"><i/> Realtime inbox</span></div><div className={`dhl-admin-chat-grid${showConversation?' mobile-conversation':''}${infoOpen?' mobile-info':''}`}><aside className="dhl-admin-chat-list"><div className="dhl-admin-chat-list-head"><strong>Conversations</strong><small>{ordered.filter(item=>item.unreadForAdmin>0).length} unread</small></div><div className="dhl-admin-list-search"><Search size={16}/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder="Search tracking ID or customer" aria-label="Search conversations"/></div><div className="dhl-admin-tabs" role="tablist" aria-label="Conversation filter"><button role="tab" type="button" className={filter==='all'?'active':''} aria-selected={filter==='all'} onClick={()=>setFilter('all')}>All</button><button role="tab" type="button" className={filter==='unread'?'active':''} aria-selected={filter==='unread'} onClick={()=>setFilter('unread')}>Unread</button></div><div className="dhl-admin-chat-threads">{loading?<div className="dhl-admin-empty">Loading conversations...</div>:list.length?list.map(thread=><button type="button" key={thread.id} className={selected?.id===thread.id?'active':''} onClick={()=>{setInfoOpen(false);navigate(`/admin/chat/${thread.id}`);}}><span className="dhl-admin-chat-customer-avatar"><Package size={17}/></span><span className="dhl-admin-chat-thread-copy"><strong>{thread.trackingId.slice(0,13).toUpperCase()}</strong><small>{thread.lastMessagePreview||'No messages yet'}</small></span><span className="dhl-admin-chat-thread-tail"><time>{thread.lastMessageAt?new Date(thread.lastMessageAt).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):''}</time>{thread.unreadForAdmin>0&&<b>{thread.unreadForAdmin}</b>}</span></button>):<div className="dhl-admin-empty"><MessageCircle size={22}/><strong>No conversations</strong></div>}</div></aside>{selected?<><Conversation key={selected.id} thread={selected} onBack={()=>navigate('/admin/chat')} onInfo={()=>setInfoOpen(true)}/><ShipmentContext thread={selected} onClose={()=>setInfoOpen(false)}/></>:<div className="dhl-admin-chat-no-selection"><Headphones size={32}/><strong>No active chat</strong><span>New support conversations will appear here.</span></div>}</div></div>;}

@@ -27,6 +27,8 @@ type ChatMessageRow = {
   created_at: string;
   animate_typing?: boolean | null;
   typing_speed_ms?: number | null;
+  reply_to_message_id?: string | null;
+  support_profile_id?: string | null;
 };
 
 const CHAT_MEDIA_BUCKET = "chat-media";
@@ -54,7 +56,19 @@ const toMessage = (row: ChatMessageRow): ChatMessage => ({
   createdAt: new Date(row.created_at).getTime(),
   animateTyping: row.animate_typing ?? false,
   typingSpeedMs: row.typing_speed_ms ?? undefined,
+  replyToMessageId: row.reply_to_message_id ?? undefined,
+  supportProfileId: row.support_profile_id ?? undefined,
 });
+
+const withReplyTargets = (rows: ChatMessageRow[]): ChatMessage[] => {
+  const messages = rows.map(toMessage);
+  const byId = new Map(messages.map(message => [message.id, message]));
+  return messages.map(message => {
+    const target = message.replyToMessageId ? byId.get(message.replyToMessageId) : undefined;
+    if (!target) return message;
+    return { ...message, replyTo: { id: target.id, sender: target.sender, senderName: target.senderName, text: target.text, media: target.media, supportProfileId: target.supportProfileId } };
+  });
+};
 
 const makeFileId = () => {
   try {
@@ -136,6 +150,8 @@ export async function sendChatMessage(payload: {
   media?: MediaAttachment[];
   animateTyping?: boolean;
   typingSpeedMs?: number;
+  replyToMessageId?: string;
+  supportProfileId?: string;
 }) {
   const trimmed = payload.trackingId.trim();
   if (!trimmed) return { data: null, error: "Missing tracking ID" };
@@ -151,29 +167,37 @@ export async function sendChatMessage(payload: {
     ? await uploadChatMedia(payload.mediaFiles, trimmed)
     : [];
   const combinedMedia = [...(payload.media || []), ...uploads];
-  const cleanedText = payload.text?.trim() || null;
+  const cleanedText = payload.text?.trimEnd() || null;
 
   if (!cleanedText && combinedMedia.length === 0) {
     return { data: null, error: "Message is empty" };
   }
 
-  const { data, error } = await supabase
+  const insertRow = {
+    thread_id: thread.id,
+    tracking_id: trimmed,
+    sender_role: payload.sender,
+    sender_name: payload.senderName || null,
+    sender_avatar_url: payload.senderAvatarUrl || null,
+    text: cleanedText,
+    media: combinedMedia,
+    animate_typing: payload.animateTyping ?? false,
+    typing_speed_ms: payload.typingSpeedMs ?? null,
+    reply_to_message_id: payload.replyToMessageId || null,
+    support_profile_id: payload.supportProfileId || null,
+  };
+  let { data, error } = await supabase
     .from("chat_messages")
-    .insert([
-      {
-        thread_id: thread.id,
-        tracking_id: trimmed,
-        sender_role: payload.sender,
-        sender_name: payload.senderName || null,
-        sender_avatar_url: payload.senderAvatarUrl || null,
-        text: cleanedText,
-        media: combinedMedia,
-        animate_typing: payload.animateTyping ?? false,
-        typing_speed_ms: payload.typingSpeedMs ?? null,
-      },
-    ])
+    .insert([insertRow])
     .select("*")
     .single();
+
+  // Protect current production chat while the additive migration is waiting to
+  // be applied. Reply/persona metadata will simply be unavailable there.
+  if (error && (error.code === 'PGRST204' || /reply_to_message_id|support_profile_id/i.test(error.message || ''))) {
+    const { reply_to_message_id: _reply, support_profile_id: _profile, ...legacyRow } = insertRow;
+    ({ data, error } = await supabase.from("chat_messages").insert([legacyRow]).select("*").single());
+  }
 
   if (error) {
     console.error("Failed to send chat message:", error);
@@ -285,7 +309,7 @@ export function useChatMessages(trackingId: string, threadId?: string) {
         return;
       }
 
-      const mapped = (data as ChatMessageRow[]).map(toMessage);
+      const mapped = withReplyTargets(data as ChatMessageRow[]);
       setMessages(mapped);
       setLoading(false);
     };
@@ -315,7 +339,10 @@ export function useChatMessages(trackingId: string, threadId?: string) {
             const next = toMessage(newRow);
             setMessages((prev) => {
               if (prev.some((msg) => msg.id === next.id)) return prev;
-              return [...prev, next];
+              const withNew = [...prev, next];
+              return withNew.map(message => message.replyToMessageId
+                ? { ...message, replyTo: (() => { const target = withNew.find(item => item.id === message.replyToMessageId); return target ? { id: target.id, sender: target.sender, senderName: target.senderName, text: target.text, media: target.media, supportProfileId: target.supportProfileId } : undefined; })() }
+                : message);
             });
           }
 

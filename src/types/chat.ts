@@ -19,6 +19,16 @@ export interface ChatMessage {
   createdAt: number;
   animateTyping?: boolean;
   typingSpeedMs?: number;
+  replyToMessageId?: string;
+  replyTo?: {
+    id: string;
+    sender: ChatRole;
+    senderName?: string;
+    text?: string;
+    media?: MediaAttachment[];
+    supportProfileId?: string;
+  };
+  supportProfileId?: string;
 }
 
 export interface ChatThreadSummary {
