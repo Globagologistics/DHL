@@ -1,224 +1,202 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { BellRing, Box, Check, ChevronLeft, ChevronRight, FileText, ImagePlus, Package, Plane, Ship, Truck, Warehouse } from 'lucide-react';
-import type { ShipmentDetails, StructuredAddress } from '../../types/database';
+import { Anchor, Bike, Check, ChevronLeft, ChevronRight, FileText, MapPinned, Package, Plane, Truck, UserRound } from 'lucide-react';
+import { PackagePhotoUploader } from '../media/PackagePhotoUploader';
+import { RoutePicker } from '../map/RoutePicker';
+import { RouteMap } from '../map/RouteMap';
+import { RouteLocationField } from '../map/LocationFields';
+import { formatDistance, pathLengthKm } from '../map/geo';
+import { carrierRoles, currencies, defaultCarrierRole, emptyShipmentDraft, paymentLabels, transportMethods } from '../shipments/types';
+import type { PaymentChoice, ShipmentDraft, TransportMethod } from '../shipments/types';
+import type { PackagePhoto } from '../../services/shipmentWorkflowService';
 
-export type ShipmentType = NonNullable<ShipmentDetails['shipmentType']>;
+export type { ShipmentDraft };
 
 /**
- * Wizard draft. The structured address parts are composed into the existing
- * single-line pickupLocation / deliveryAddress columns on submit, and the
- * remaining structured fields travel in `details` (shipments.shipment_details).
+ * Guided shipment form, written for someone with no logistics background.
+ *
+ *   admin:  Sender · Receiver · Consignment · Carrier & Delivery · Review
+ *   public: Sender · Receiver · Package · Review
+ *
+ * Moving between steps never clears anything; text fields are also kept for
+ * the browser session (photos stay in memory until submit).
  */
-export type ShipmentDraft = {
-  senderName:string; senderCompany:string; senderPhone:string; senderEmail:string;
-  senderAddress:string; senderCity:string; senderState:string; senderPostalCode:string; senderCountry:string;
-  receiverName:string; receiverCompany:string; receiverPhone:string; receiverEmail:string;
-  receiverAddress:string; receiverCity:string; receiverState:string; receiverPostalCode:string; receiverCountry:string;
-  shipmentType:ShipmentType; pieces:string; weightKg:string; lengthCm:string; widthCm:string; heightCm:string; packageName:string; reference:string;
-  images:string[]; imageFiles:File[];
-  transportation:string; vehicleType:string; vehiclesCount:string; driverName:string; driverExperience:string; countdownDuration:string;
-  cost:string; currency:string; paymentStatus:'unpaid'|'pending'|'paid'; paymentResponsibility:'sender'|'receiver'|'company'; checkpoints:string[];
-  /** Composed on submit from the structured address fields. */
-  pickupLocation:string; deliveryAddress:string;
-  /** Built on submit from the structured fields. */
-  details?:ShipmentDetails;
+
+type Mode = 'admin' | 'public';
+type Props = {
+  mode: Mode;
+  initial?: ShipmentDraft;
+  initialPhotos?: PackagePhoto[];
+  submitLabel: string;
+  onSubmit: (draft: ShipmentDraft, photos: PackagePhoto[]) => Promise<void>;
+  submitting: boolean;
+  submitError: string;
+  /** sessionStorage key for draft persistence; omit to disable. */
+  draftKey?: string;
+  /** Extra content under the review cards (for example the reject panel). */
+  reviewFooter?: ReactNode;
+  /** Start on a later step (for example Review when editing). */
+  startStep?: number;
 };
 
-export const initialShipmentDraft:ShipmentDraft = {
-  senderName:'',senderCompany:'',senderPhone:'',senderEmail:'',senderAddress:'',senderCity:'',senderState:'',senderPostalCode:'',senderCountry:'',
-  receiverName:'',receiverCompany:'',receiverPhone:'',receiverEmail:'',receiverAddress:'',receiverCity:'',receiverState:'',receiverPostalCode:'',receiverCountry:'',
-  shipmentType:'parcel',pieces:'1',weightKg:'',lengthCm:'',widthCm:'',heightCm:'',packageName:'',reference:'',
-  images:['','',''],imageFiles:[],
-  transportation:'Air Freight',vehicleType:'',vehiclesCount:'',driverName:'',driverExperience:'',countdownDuration:'24',
-  cost:'',currency:'USD',paymentStatus:'unpaid',paymentResponsibility:'sender',checkpoints:['','','','',''],
-  pickupLocation:'',deliveryAddress:'',
-};
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE = /^[+\d][\d\s().-]{5,}$/;
+const transportIcons: Record<TransportMethod, typeof Plane> = { 'Air Freight': Plane, 'Sea Freight': Anchor, Truck, 'Courier / Dispatcher': UserRound, Motorcycle: Bike };
 
-const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const countries = ['United States','Canada','Mexico','United Kingdom','Ireland','Germany','France','Netherlands','Belgium','Spain','Italy','Switzerland','Sweden','Norway','Denmark','Poland','United Arab Emirates','Saudi Arabia','Qatar','India','China','Hong Kong','Singapore','Japan','South Korea','Australia','New Zealand','South Africa','Nigeria','Ghana','Kenya','Egypt','Brazil','Argentina'];
-const shipmentTypes:{value:ShipmentType;label:string;description:string;icon:typeof Package}[] = [
-  {value:'document',label:'Document',description:'Letters, contracts, papers',icon:FileText},
-  {value:'parcel',label:'Parcel',description:'Boxed goods and packages',icon:Package},
-  {value:'freight',label:'Freight',description:'Palletised or heavy cargo',icon:Warehouse},
-  {value:'other',label:'Other',description:'Anything else',icon:Box},
-];
-const transports = [{value:'Air Freight',label:'Air Freight',icon:Plane},{value:'Ocean Cargo',label:'Ocean Cargo',icon:Ship},{value:'Land Transport',label:'Land Transport',icon:Truck},{value:'Door-to-Door Delivery',label:'Door-to-Door',icon:Package}];
-
-type Party = 'sender'|'receiver';
-const partyKeys = (party:Party) => ({
-  name:`${party}Name`, company:`${party}Company`, phone:`${party}Phone`, email:`${party}Email`, address:`${party}Address`,
-  city:`${party}City`, state:`${party}State`, postal:`${party}PostalCode`, country:`${party}Country`,
-} as const);
-
-const structuredAddress = (draft:ShipmentDraft, party:Party):StructuredAddress => {
-  const keys = partyKeys(party);
-  return { company:draft[keys.company].trim()||undefined, address:draft[keys.address].trim(), city:draft[keys.city].trim(), state:draft[keys.state].trim()||undefined, postalCode:draft[keys.postal].trim()||undefined, country:draft[keys.country].trim() };
-};
-
-/** "Company, Street, City, State Postal, Country" for the existing single-line columns. */
-export function composeAddress(parts:StructuredAddress):string {
-  const region = [parts.state, parts.postalCode].filter(Boolean).join(' ');
-  return [parts.company, parts.address, parts.city, region, parts.country].map(value => value?.trim()).filter(Boolean).join(', ');
+function readDraft(key?: string): ShipmentDraft | null {
+  if (!key) return null;
+  try { const stored = sessionStorage.getItem(key); return stored ? { ...emptyShipmentDraft, ...JSON.parse(stored), images: [] } : null; } catch { return null; }
 }
 
-const positiveNumber = (value:string) => { const parsed = Number(value); return value.trim() !== '' && Number.isFinite(parsed) && parsed > 0 ? parsed : undefined; };
-
-/** Fills pickupLocation, deliveryAddress and details from the structured fields. */
-export function finalizeDraft(draft:ShipmentDraft):ShipmentDraft {
-  const sender = structuredAddress(draft,'sender');
-  const recipient = structuredAddress(draft,'receiver');
-  const details:ShipmentDetails = {
-    shipmentType:draft.shipmentType,
-    pieces:positiveNumber(draft.pieces),
-    weightKg:positiveNumber(draft.weightKg),
-    dimensionsCm:(draft.lengthCm||draft.widthCm||draft.heightCm)?{length:positiveNumber(draft.lengthCm),width:positiveNumber(draft.widthCm),height:positiveNumber(draft.heightCm)}:undefined,
-    reference:draft.reference.trim()||undefined,
-    sender, recipient,
-  };
-  return { ...draft, pickupLocation:composeAddress(sender), deliveryAddress:composeAddress(recipient), details };
-}
-
-export function describeShipment(details?:ShipmentDetails|null):string {
-  if (!details) return '';
-  const type = shipmentTypes.find(item => item.value === details.shipmentType)?.label;
-  const size = details.dimensionsCm && [details.dimensionsCm.length, details.dimensionsCm.width, details.dimensionsCm.height].every(Boolean) ? `${details.dimensionsCm.length}×${details.dimensionsCm.width}×${details.dimensionsCm.height} cm` : '';
-  return [type, details.pieces ? `${details.pieces} piece${details.pieces === 1 ? '' : 's'}` : '', details.weightKg ? `${details.weightKg} kg` : '', size].filter(Boolean).join(' · ');
-}
-
-type Props = { mode:'admin'|'public'; onSubmit:(draft:ShipmentDraft)=>Promise<void>; submitting:boolean; submitError:string };
-
-export default function ShipmentWizard({mode,onSubmit,submitting,submitError}:Props) {
+export default function ShipmentWizard({ mode, initial, initialPhotos = [], submitLabel, onSubmit, submitting, submitError, draftKey, reviewFooter, startStep = 0 }: Props) {
   const isAdmin = mode === 'admin';
-  const steps = ['Sender','Recipient','Shipment','Services & Tracking',isAdmin?'Review & Publish':'Review & Submit'];
-  const intros = ['Who is sending this shipment?','Where is it going and who will receive it?','What is being shipped?',isAdmin?'Choose the service, route milestones and payment details.':'Choose how you would like it shipped.','Check every detail before the final action.'];
-  const [step,setStep] = useState(0);
-  const [draft,setDraft] = useState<ShipmentDraft>(initialShipmentDraft);
-  const [error,setError] = useState('');
-  const [imagePreview,setImagePreview] = useState<string[]>([]);
-  useEffect(() => () => imagePreview.forEach(url => URL.revokeObjectURL(url)), [imagePreview]);
-  const set = <K extends keyof ShipmentDraft>(key:K,value:ShipmentDraft[K]) => { setDraft(current=>({...current,[key]:value})); setError(''); };
-  const imageUrls = useMemo(()=>draft.images.map(value=>value.trim()).filter(Boolean),[draft.images]);
+  const steps = isAdmin
+    ? [{ title: 'Sender', intro: 'Who is sending this shipment?' }, { title: 'Receiver', intro: 'Who will receive it, and where?' }, { title: 'Consignment', intro: 'What is being shipped?' }, { title: 'Carrier & Delivery', intro: 'How it travels and when it should arrive.' }, { title: 'Review', intro: 'Check everything before creating the shipment.' }]
+    : [{ title: 'Sender', intro: 'Who is sending this shipment?' }, { title: 'Receiver', intro: 'Who will receive it, and where?' }, { title: 'Package', intro: 'Tell us what you are sending.' }, { title: 'Review', intro: 'Check your details before submitting.' }];
+  const last = steps.length - 1;
+  const [step, setStep] = useState(startStep);
+  const [draft, setDraft] = useState<ShipmentDraft>(() => initial || readDraft(draftKey) || emptyShipmentDraft);
+  const [photos, setPhotos] = useState<PackagePhoto[]>(initialPhotos);
+  const [error, setError] = useState('');
+  const [routeOpen, setRouteOpen] = useState(false);
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Release photo preview URLs only when the whole wizard goes away.
+  const photosRef = useRef(photos);
+  photosRef.current = photos;
+  useEffect(() => () => photosRef.current.forEach(photo => { if (photo.url.startsWith('blob:')) URL.revokeObjectURL(photo.url); }), []);
 
-  const validParty = (party:Party, label:string) => {
-    const keys = partyKeys(party);
-    const required:[keyof ShipmentDraft,string][] = [[keys.name,'full name'],[keys.phone,'phone'],[keys.email,'email'],[keys.address,'address'],[keys.city,'city'],[keys.country,'country']];
-    for (const [key,name] of required) if (!String(draft[key]||'').trim()) return `${label} ${name} is required.`;
-    if (!EMAIL_PATTERN.test(draft[keys.email].trim())) return `Enter a valid ${label.toLowerCase()} email address.`;
-    if (!/^[+\d][\d\s().-]{5,}$/.test(draft[keys.phone].trim())) return `Enter a valid ${label.toLowerCase()} phone number.`;
+  useEffect(() => {
+    if (!draftKey) return;
+    try { const { images: _images, ...text } = draft; sessionStorage.setItem(draftKey, JSON.stringify(text)); } catch { /* storage unavailable */ }
+  }, [draft, draftKey]);
+
+  const set = <K extends keyof ShipmentDraft>(key: K, value: ShipmentDraft[K]) => { setDraft(current => ({ ...current, [key]: value })); setError(''); };
+  const setTransport = (transportation: TransportMethod) => setDraft(current => ({ ...current, transportation, carrierRole: !current.carrierRole || Object.values(defaultCarrierRole).includes(current.carrierRole) ? defaultCarrierRole[transportation] : current.carrierRole }));
+
+  const problem = (index: number): string => {
+    if (index === 0) {
+      if (!draft.senderName.trim()) return 'Enter sender name.';
+      if (draft.senderPhone.trim() && !PHONE.test(draft.senderPhone.trim())) return 'Enter a valid sender phone number, or leave it empty.';
+      if (!draft.pickupLocation.trim()) return 'Enter pickup address.';
+    }
+    if (index === 1) {
+      if (!draft.receiverName.trim()) return 'Enter receiver name.';
+      if (!PHONE.test(draft.receiverPhone.trim())) return 'Enter receiver phone number.';
+      if (!EMAIL.test(draft.receiverEmail.trim())) return 'Enter receiver email.';
+      if (!draft.deliveryAddress.trim()) return 'Enter drop-off address.';
+    }
+    if (index === 2) {
+      if (!draft.packageName.trim()) return 'Enter what is being shipped.';
+      if (draft.packageValue.trim() && !(Number(draft.packageValue) >= 0)) return 'Package value must be a number.';
+      if (isAdmin && draft.paymentStatus === 'pending' && draft.outstandingAmount.trim() && !(Number(draft.outstandingAmount) > 0)) return 'Outstanding amount must be more than 0.';
+      if (photos.length < 1) return 'Upload at least one package image.';
+      if (photos.length > 3) return 'Use no more than 3 package images.';
+    }
+    if (index === 3 && isAdmin) {
+      const eta = draft.estimatedDelivery ? new Date(draft.estimatedDelivery).getTime() : NaN;
+      if (!Number.isFinite(eta)) return 'Set the estimated delivery date and time.';
+      if (eta <= Date.now()) return 'The estimated delivery must be in the future.';
+      if (!draft.carrierRole.trim()) return 'Choose the carrier role.';
+    }
     return '';
   };
-  const validStep = (index:number) => {
-    if (index===0) return validParty('sender','Sender');
-    if (index===1) return validParty('receiver','Recipient');
-    if (index===2) {
-      if (!draft.packageName.trim()) return 'Describe the contents of the shipment.';
-      if (!Number.isInteger(Number(draft.pieces)) || Number(draft.pieces) < 1) return 'Pieces must be a whole number of at least 1.';
-      if (!positiveNumber(draft.weightKg)) return 'Enter the total weight in kilograms.';
-      if ([draft.lengthCm,draft.widthCm,draft.heightCm].some(value => value.trim() && !positiveNumber(value))) return 'Dimensions must be positive numbers.';
-      if (isAdmin && imageUrls.length+draft.imageFiles.length<3) return 'Add at least 3 package images or image links.';
-      if (imageUrls.length+draft.imageFiles.length>6) return 'Use no more than 6 package images.';
-      if (imageUrls.some(url=>!/^https?:\/\//i.test(url))) return 'Image links must start with http or https.';
-    }
-    if (index===3 && isAdmin) {
-      if (!draft.vehicleType.trim()) return 'Vehicle or aircraft type is required.';
-      if (!positiveNumber(draft.countdownDuration)) return 'Estimated hours to arrival must be greater than 0.';
-      if (draft.cost.trim() && !(Number(draft.cost) >= 0)) return 'Shipping cost must be 0 or more.';
-      if (draft.checkpoints.filter(value=>value.trim()).length<5) return 'Add at least 5 route milestones.';
-    }
-    return '';
-  };
-  const goTo = (index:number) => { setStep(index); setError(''); window.scrollTo({top:0,behavior:'smooth'}); };
-  const next = () => { const issue=validStep(step); if(issue){setError(issue);return;} goTo(Math.min(step+1,4)); };
-  const finish = async (event:FormEvent) => {
+
+  const goTo = (index: number) => { setStep(index); setError(''); window.scrollTo({ top: 0, behavior: 'smooth' }); window.setTimeout(() => heading.current?.focus(), 250); };
+  const next = () => { const issue = problem(step); if (issue) { setError(issue); return; } goTo(Math.min(step + 1, last)); };
+  const finish = async (event: FormEvent) => {
     event.preventDefault();
-    if (step < 4) { next(); return; }
-    for(let index=0;index<4;index++){const issue=validStep(index);if(issue){setStep(index);setError(issue);return;}}
-    await onSubmit(finalizeDraft({...draft,images:imageUrls}));
+    if (step < last) { next(); return; }
+    for (let index = 0; index < last; index++) { const issue = problem(index); if (issue) { setStep(index); setError(issue); return; } }
+    await onSubmit(draft, photos);
+    if (draftKey) { try { sessionStorage.removeItem(draftKey); } catch { /* ignore */ } }
   };
 
-  const field = (label:string,key:keyof ShipmentDraft,options?:{type?:string;placeholder?:string;required?:boolean;optional?:boolean;wide?:boolean;list?:string;autoComplete?:string;inputMode?:'numeric'|'decimal'|'tel'|'email'}) => <label className={`dhl-admin-form-field${options?.wide?' wide':''}`}><span>{label}{options?.required&&<i> *</i>}{options?.optional&&<em> optional</em>}</span><input type={options?.type||'text'} value={String(draft[key]??'')} onChange={event=>set(key,event.target.value as ShipmentDraft[typeof key])} placeholder={options?.placeholder||''} autoComplete={options?.autoComplete||'off'} list={options?.list} inputMode={options?.inputMode} /></label>;
-  const partyFields = (party:Party, placeholderName:string) => {
-    const keys = partyKeys(party);
-    return <div className="dhl-admin-form-grid">
-      {field('Full name',keys.name,{required:true,placeholder:placeholderName,autoComplete:'name'})}
-      {field('Company',keys.company,{optional:true,placeholder:'Company name',autoComplete:'organization'})}
-      {field('Phone',keys.phone,{required:true,type:'tel',inputMode:'tel',placeholder:'+1 555 000 0000',autoComplete:'tel'})}
-      {field('Email',keys.email,{required:true,type:'email',inputMode:'email',placeholder:'name@example.com',autoComplete:'email'})}
-      {field(party==='sender'?'Address':'Delivery address',keys.address,{required:true,wide:true,placeholder:'Street and number, building, unit',autoComplete:'street-address'})}
-      {field('City',keys.city,{required:true,placeholder:'City',autoComplete:'address-level2'})}
-      {field('State / Province',keys.state,{placeholder:'State or province',autoComplete:'address-level1'})}
-      {field('Postal code',keys.postal,{placeholder:'Postal / ZIP code',autoComplete:'postal-code'})}
-      {field('Country',keys.country,{required:true,placeholder:'Country',list:'dhl-wizard-countries',autoComplete:'country-name'})}
-    </div>;
-  };
-  const previews = [...imageUrls.map(url=>({key:url,url,label:'Image link'})),...draft.imageFiles.map((file,index)=>({key:`file-${index}`,url:imagePreview[index],label:file.name}))];
-  const finalized = step===4 ? finalizeDraft({...draft,images:imageUrls}) : null;
-  const reviewCard = (title:string,index:number,body:ReactNode) => <section><div><h3>{title}</h3><button type="button" onClick={()=>goTo(index)}>Edit</button></div><p>{body}</p></section>;
+  const text = (label: string, key: keyof ShipmentDraft, options: { required?: boolean; optional?: boolean; type?: string; placeholder?: string; inputMode?: 'tel' | 'email' | 'decimal'; autoComplete?: string; multiline?: boolean; wide?: boolean } = {}) =>
+    <label className={`dhl-admin-form-field${options.wide || options.multiline ? ' wide' : ''}`}>
+      <span>{label}{options.required && <i> *</i>}{options.optional && <em> (Optional)</em>}</span>
+      {options.multiline
+        ? <textarea rows={2} value={String(draft[key] ?? '')} onChange={event => set(key, event.target.value as never)} placeholder={options.placeholder} autoComplete={options.autoComplete || 'off'} />
+        : <input type={options.type || 'text'} value={String(draft[key] ?? '')} onChange={event => set(key, event.target.value as never)} placeholder={options.placeholder} inputMode={options.inputMode} autoComplete={options.autoComplete || 'off'} />}
+    </label>;
 
-  return <div className="dhl-admin-wizard">
-    <datalist id="dhl-wizard-countries">{countries.map(country=><option key={country} value={country}/>)}</datalist>
-    <ol className="dhl-admin-wizard-stepper" aria-label="Shipment form progress">{steps.map((label,index)=><li key={label}><button type="button" onClick={()=>{if(index<step)goTo(index);}} className={index===step?'active':index<step?'done':''} aria-current={index===step?'step':undefined} disabled={index>step}><span>{index<step?<Check size={14}/>:index+1}</span><strong>{label}</strong></button></li>)}</ol>
+  const reviewCard = (title: string, index: number, body: ReactNode) => <section><div><h3>{title}</h3><button type="button" onClick={() => goTo(index)}>Edit</button></div><div className="dhl-admin-review-body">{body}</div></section>;
+  const money = (value: string) => value.trim() ? `${draft.currency} ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not provided';
+  const eta = draft.estimatedDelivery ? new Date(draft.estimatedDelivery).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not set';
+  const packageStep = 2;
+  const carrierStep = 3;
+
+  return <div className={`dhl-admin-wizard ${mode}`}>
+    <ol className="dhl-admin-wizard-stepper" aria-label="Form progress">{steps.map((item, index) => <li key={item.title}><button type="button" onClick={() => { if (index < step) goTo(index); }} className={index === step ? 'active' : index < step ? 'done' : ''} aria-current={index === step ? 'step' : undefined} disabled={index > step}><span>{index < step ? <Check size={14} /> : index + 1}</span><strong>{item.title}</strong></button></li>)}</ol>
     <form onSubmit={finish} noValidate><div className="dhl-admin-wizard-panel">
-      <div className="dhl-admin-wizard-heading"><span>STEP {step+1} OF 5</span><h2>{steps[step]}</h2><p>{intros[step]}</p></div>
-      {error&&<p className="dhl-admin-banner error" role="alert">{error}</p>}{submitError&&<p className="dhl-admin-banner error" role="alert">{submitError}</p>}
+      <div className="dhl-admin-wizard-heading"><span>STEP {step + 1} OF {steps.length}</span><h2 ref={heading} tabIndex={-1}>{steps[step].title}</h2><p>{steps[step].intro}</p></div>
+      {error && <p className="dhl-admin-banner error" role="alert">{error}</p>}
+      {submitError && <p className="dhl-admin-banner error" role="alert">{submitError}</p>}
 
-      {step===0&&partyFields('sender','Sender full name')}
-      {step===1&&partyFields('receiver','Recipient full name')}
-
-      {step===2&&<>
-        <h3>Shipment type</h3>
-        <div className="dhl-admin-choice-grid dhl-admin-type-grid" role="radiogroup" aria-label="Shipment type">{shipmentTypes.map(({value,label,description,icon:Icon})=><button type="button" role="radio" aria-checked={draft.shipmentType===value} key={value} className={draft.shipmentType===value?'selected':''} onClick={()=>set('shipmentType',value)}><Icon size={20}/><strong>{label}</strong><small>{description}</small></button>)}</div>
-        <div className="dhl-admin-form-grid">
-          {field('Pieces','pieces',{required:true,type:'number',inputMode:'numeric',placeholder:'1'})}
-          {field('Total weight (kg)','weightKg',{required:true,type:'number',inputMode:'decimal',placeholder:'0.0'})}
-          <div className="dhl-admin-form-field wide"><span>Dimensions (cm) <em>optional</em></span><div className="dhl-admin-dimension-fields"><input aria-label="Length in centimetres" type="number" inputMode="decimal" placeholder="Length" value={draft.lengthCm} onChange={event=>set('lengthCm',event.target.value)}/><b aria-hidden="true">×</b><input aria-label="Width in centimetres" type="number" inputMode="decimal" placeholder="Width" value={draft.widthCm} onChange={event=>set('widthCm',event.target.value)}/><b aria-hidden="true">×</b><input aria-label="Height in centimetres" type="number" inputMode="decimal" placeholder="Height" value={draft.heightCm} onChange={event=>set('heightCm',event.target.value)}/></div></div>
-          {field('Description of contents','packageName',{required:true,wide:true,placeholder:'e.g. Documents, electronics, medical supplies'})}
-          {field('Reference','reference',{optional:true,placeholder:'Order or invoice number'})}
-        </div>
-        <div className="dhl-admin-form-divider"/>
-        <h3>Package images <small>{isAdmin?'At least 3, up to 6.':'Optional image links to help our team review the request.'}</small></h3>
-        {isAdmin&&<label className="dhl-admin-upload"><ImagePlus size={25}/><strong>Upload package images</strong><small>Select up to 6 images from your device</small><input type="file" accept="image/*" multiple onChange={event=>{const files=Array.from(event.target.files||[]).filter(file=>file.type.startsWith('image/')).slice(0,Math.max(0,6-imageUrls.length)); setImagePreview(files.map(file=>URL.createObjectURL(file))); set('imageFiles',files);}} /></label>}
-        <div className="dhl-admin-form-grid">{draft.images.map((url,index)=><label className="dhl-admin-form-field" key={index}><span>Image URL {index+1}</span><input type="url" inputMode="url" placeholder="https://..." value={url} onChange={event=>set('images',draft.images.map((item,i)=>i===index?event.target.value:item))} /></label>)}</div>
-        {draft.images.length+draft.imageFiles.length<6&&<button className="dhl-admin-text-action" type="button" onClick={()=>set('images',[...draft.images,''])}>+ Add another image URL</button>}
-        {previews.length>0&&<div className="dhl-admin-image-previews">{previews.map(item=><div key={item.key}><img src={item.url} alt={item.label} onError={event=>{event.currentTarget.style.display='none';}}/><span>{item.label}</span></div>)}</div>}
-      </>}
-
-      {step===3&&<>
-        <h3>Service type</h3>
-        <div className="dhl-admin-choice-grid">{transports.map(({value,label,icon:Icon})=><button type="button" key={value} className={draft.transportation===value?'selected':''} aria-pressed={draft.transportation===value} onClick={()=>set('transportation',value)}><Icon size={20}/><strong>{label}</strong></button>)}</div>
-        {isAdmin?<>
-          <div className="dhl-admin-form-grid">
-            {field('Vehicle / aircraft / vessel type','vehicleType',{required:true,placeholder:'e.g. Cargo van, aircraft'})}
-            {field('Number of vehicles','vehiclesCount',{type:'number',inputMode:'numeric',placeholder:'1'})}
-            {field('Driver / pilot name','driverName',{optional:true})}
-            {field('Driver experience','driverExperience',{optional:true})}
-            {field('Estimated hours to arrival','countdownDuration',{required:true,type:'number',inputMode:'numeric',placeholder:'24'})}
-            {field('Shipping cost','cost',{type:'number',inputMode:'decimal',placeholder:'0.00'})}
-            <label className="dhl-admin-form-field"><span>Currency</span><select value={draft.currency} onChange={event=>set('currency',event.target.value)}><option>USD</option><option>EUR</option><option>GBP</option><option>NGN</option></select></label>
-            <label className="dhl-admin-form-field"><span>Payment responsibility</span><select value={draft.paymentResponsibility} onChange={event=>set('paymentResponsibility',event.target.value as ShipmentDraft['paymentResponsibility'])}><option value="sender">Sender</option><option value="receiver">Receiver</option><option value="company">Company</option></select></label>
-            <label className="dhl-admin-form-field"><span>Payment status</span><select value={draft.paymentStatus} onChange={event=>set('paymentStatus',event.target.value as ShipmentDraft['paymentStatus'])}><option value="unpaid">Unpaid</option><option value="pending">Awaiting payment</option><option value="paid">Paid</option></select></label>
-          </div>
-          <div className="dhl-admin-form-divider"/>
-          <h3>Tracking checkpoints <small>Route milestones customers see on the timeline. At least 5, up to 12.</small></h3>
-          <div className="dhl-admin-form-grid">{draft.checkpoints.map((location,index)=><label className="dhl-admin-form-field" key={index}><span>Milestone {index+1}</span><input value={location} onChange={event=>set('checkpoints',draft.checkpoints.map((item,i)=>i===index?event.target.value:item))} placeholder="City or facility" /></label>)}</div>
-          {draft.checkpoints.length<12&&<button className="dhl-admin-text-action" type="button" onClick={()=>set('checkpoints',[...draft.checkpoints,''])}>+ Add milestone</button>}
-        </>:<div className="dhl-admin-form-grid">
-          <label className="dhl-admin-form-field"><span>Who pays for shipping?</span><select value={draft.paymentResponsibility} onChange={event=>set('paymentResponsibility',event.target.value as ShipmentDraft['paymentResponsibility'])}><option value="sender">Sender</option><option value="receiver">Recipient</option></select></label>
-        </div>}
-        <div className="dhl-admin-info-row"><BellRing size={18}/><span><strong>Customer notifications</strong>{isAdmin?'Sender and recipient receive email updates automatically once the shipment is published, using the notification settings.':'You will receive email updates at the addresses provided once our team approves the request.'}</span></div>
-        {!isAdmin&&<div className="dhl-admin-info-row"><Truck size={18}/><span><strong>Routing and pricing</strong>Our team confirms the vehicle, route checkpoints and price during review.</span></div>}
-      </>}
-
-      {step===4&&finalized&&<div className="dhl-admin-review">
-        {reviewCard('Sender',0,<>{draft.senderName}{draft.senderCompany&&<> · {draft.senderCompany}</>}<br/>{draft.senderEmail} · {draft.senderPhone}<br/>{finalized.pickupLocation}</>)}
-        {reviewCard('Recipient',1,<>{draft.receiverName}{draft.receiverCompany&&<> · {draft.receiverCompany}</>}<br/>{draft.receiverEmail} · {draft.receiverPhone}<br/>{finalized.deliveryAddress}</>)}
-        {reviewCard('Shipment',2,<>{describeShipment(finalized.details)}<br/>{draft.packageName}{draft.reference&&<><br/>Reference {draft.reference}</>}<br/>{imageUrls.length+draft.imageFiles.length} package image{imageUrls.length+draft.imageFiles.length===1?'':'s'}</>)}
-        {reviewCard('Services & tracking',3,isAdmin?<>{draft.transportation} · {draft.vehicleType}<br/>{draft.checkpoints.filter(Boolean).length} milestones · {draft.countdownDuration} hours ETA<br/>{draft.currency} {draft.cost||'0'} · {draft.paymentStatus} · paid by {draft.paymentResponsibility}</>:<>{draft.transportation}<br/>Paid by {draft.paymentResponsibility==='receiver'?'recipient':'sender'}</>)}
-        <div className="dhl-admin-review-note"><FileText size={18}/><span>{isAdmin?'Publishing creates an active shipment, assigns its 12-digit tracking number and notifies the sender and recipient.':'Submitting creates a pending request. No shipment becomes active until our team approves it.'}</span></div>
+      {step === 0 && <div className="dhl-admin-form-grid single">
+        {text('Sender Name', 'senderName', { required: true, placeholder: 'Full name', autoComplete: 'name' })}
+        {text('Sender Phone', 'senderPhone', { optional: true, type: 'tel', inputMode: 'tel', placeholder: '+1 555 000 0000', autoComplete: 'tel' })}
+        {text('Pickup Address', 'pickupLocation', { required: true, multiline: true, placeholder: '123 Business Avenue, New York, NY, United States', autoComplete: 'street-address' })}
+        {isAdmin && <RouteLocationField label="Pickup location on the map" address={draft.pickupLocation} value={draft.route.origin} onChange={origin => setDraft(current => ({ ...current, route: { ...current.route, origin } }))} />}
       </div>}
 
-      <div className="dhl-admin-wizard-footer"><button type="button" className="dhl-admin-button" onClick={()=>goTo(Math.max(0,step-1))} disabled={step===0}><ChevronLeft size={16}/> Back</button>{step<4?<button type="submit" className="dhl-admin-button primary">Continue <ChevronRight size={16}/></button>:<button type="submit" className="dhl-admin-button primary" disabled={submitting}>{submitting?(isAdmin?'Publishing…':'Submitting…'):isAdmin?'Publish Shipment':'Submit Request'} <ChevronRight size={16}/></button>}</div>
+      {step === 1 && <div className="dhl-admin-form-grid single">
+        {text('Receiver Name', 'receiverName', { required: true, placeholder: 'Full name' })}
+        {text('Receiver Phone', 'receiverPhone', { required: true, type: 'tel', inputMode: 'tel', placeholder: '+1 555 000 0000' })}
+        {text('Receiver Email', 'receiverEmail', { required: true, type: 'email', inputMode: 'email', placeholder: 'name@example.com' })}
+        {text('Drop-off Address', 'deliveryAddress', { required: true, multiline: true, placeholder: '1200 Wilshire Blvd, Los Angeles, CA, United States' })}
+        {isAdmin && <RouteLocationField label="Drop-off location on the map" address={draft.deliveryAddress} value={draft.route.destination} onChange={destination => setDraft(current => ({ ...current, route: { ...current.route, destination } }))} />}
+      </div>}
+
+      {step === packageStep && <>
+        <div className="dhl-admin-form-grid single">
+          {text('What is being shipped?', 'packageName', { required: true, placeholder: 'e.g. Personal documents, electronics, artwork' })}
+          <div className="dhl-admin-form-field wide"><span>Package Value <em>(Optional)</em></span><div className="dhl-admin-money"><select value={draft.currency} onChange={event => set('currency', event.target.value)} aria-label="Currency">{currencies.map(code => <option key={code}>{code}</option>)}</select><input type="number" inputMode="decimal" min="0" value={draft.packageValue} onChange={event => set('packageValue', event.target.value)} placeholder="0.00" aria-label="Package value" /></div></div>
+        </div>
+        {isAdmin && <>
+          <h3 className="dhl-admin-step-subhead">Payment Status</h3>
+          <div className="dhl-admin-choice-grid payment" role="radiogroup" aria-label="Payment status">{(Object.keys(paymentLabels) as PaymentChoice[]).map(value => <button key={value} type="button" role="radio" aria-checked={draft.paymentStatus === value} className={draft.paymentStatus === value ? 'selected' : ''} onClick={() => set('paymentStatus', value)}><strong>{paymentLabels[value]}</strong></button>)}</div>
+          {draft.paymentStatus === 'pending' && <div className="dhl-admin-form-grid single">{text('Outstanding Amount', 'outstandingAmount', { optional: true, type: 'number', inputMode: 'decimal', placeholder: '0.00' })}</div>}
+        </>}
+        <h3 className="dhl-admin-step-subhead">Package Photos <small>At least 1, up to 3.</small></h3>
+        <PackagePhotoUploader photos={photos} onChange={next => { setPhotos(next); setError(''); }} onError={setError} />
+      </>}
+
+      {isAdmin && step === carrierStep && <>
+        <div className="dhl-admin-form-grid single">
+          <label className="dhl-admin-form-field"><span>Estimated Delivery<i> *</i></span><input type="datetime-local" value={draft.estimatedDelivery} onChange={event => set('estimatedDelivery', event.target.value)} /></label>
+        </div>
+        <p className="dhl-settings-hint">The start time is recorded automatically when you press Start Shipment later.</p>
+        <h3 className="dhl-admin-step-subhead">Transport Method</h3>
+        <div className="dhl-admin-choice-grid transport" role="radiogroup" aria-label="Transport method">{transportMethods.map(method => { const Icon = transportIcons[method]; return <button key={method} type="button" role="radio" aria-checked={draft.transportation === method} className={draft.transportation === method ? 'selected' : ''} onClick={() => setTransport(method)}><Icon size={20} /><strong>{method}</strong></button>; })}</div>
+        <div className="dhl-admin-form-grid">
+          <label className="dhl-admin-form-field"><span>Carrier Role<i> *</i></span><select value={draft.carrierRole} onChange={event => set('carrierRole', event.target.value)}>{[...new Set([draft.carrierRole, ...carrierRoles].filter(Boolean))].map(role => <option key={role}>{role}</option>)}</select></label>
+          {text('Carrier Name', 'carrierName', { optional: true, placeholder: `${draft.carrierRole || 'Carrier'}’s name` })}
+        </div>
+      </>}
+
+      {step === last && <div className="dhl-admin-review">
+        {reviewCard('Sender', 0, <><strong>{draft.senderName}</strong>{draft.senderPhone && <span>{draft.senderPhone}</span>}<span>{draft.pickupLocation}</span></>)}
+        {reviewCard('Receiver', 1, <><strong>{draft.receiverName}</strong><span>{draft.receiverPhone} · {draft.receiverEmail}</span><span>{draft.deliveryAddress}</span></>)}
+        {reviewCard(isAdmin ? 'Consignment' : 'Package', packageStep, <><strong>{draft.packageName}</strong><span>Value: {money(draft.packageValue)}</span>{isAdmin && <span>Payment: {paymentLabels[draft.paymentStatus]}{draft.paymentStatus === 'pending' && draft.outstandingAmount ? ` · ${money(draft.outstandingAmount)} outstanding` : ''}</span>}{photos.length > 0 && <div className="dhl-admin-review-photos">{photos.map((photo, index) => <img key={photo.id} src={photo.url} alt={`Package photo ${index + 1}`} />)}</div>}</>)}
+        {isAdmin && reviewCard('Carrier & Delivery', carrierStep, <><strong>{draft.transportation}</strong><span>{draft.carrierRole}{draft.carrierName ? ` · ${draft.carrierName}` : ''}</span><span>Estimated delivery: {eta}</span></>)}
+        {isAdmin && <section className="dhl-admin-review-route">
+          <div><h3><MapPinned size={16} /> Route</h3><button type="button" onClick={() => goTo(0)}>Edit</button></div>
+          {draft.route.origin && draft.route.destination
+            ? <><RouteMap stops={[draft.route.origin, draft.route.destination]} transport={draft.transportation} height={220} ariaLabel="Route preview" /><div className="dhl-admin-review-body"><span>{draft.route.origin.detail || draft.route.origin.label} → {draft.route.destination.detail || draft.route.destination.label} · approx. {formatDistance(pathLengthKm([draft.route.origin, draft.route.destination])).km}</span></div></>
+            : <div className="dhl-admin-review-body"><span>{draft.route.origin || draft.route.destination ? 'Only one route location is set.' : 'No route locations yet.'} Confirm the pickup and drop-off locations in steps 1 and 2 to show the map.</span></div>}
+          <button type="button" className="dhl-admin-text-action" onClick={() => setRouteOpen(open => !open)}>{routeOpen ? 'Hide manual placement' : 'Advanced: place pins manually'}</button>
+          {routeOpen && <RoutePicker route={draft.route} onChange={route => set('route', route)} />}
+        </section>}
+        <div className="dhl-admin-review-note"><FileText size={18} /><span>{isAdmin ? 'Creating the shipment does not start it. You will publish it (tracking number) and start it from the control panel.' : 'Submitting sends your details for review. The shipment is not active until our team approves it.'}</span></div>
+        {reviewFooter}
+      </div>}
+
+      <div className="dhl-admin-wizard-footer">
+        <button type="button" className="dhl-admin-button" onClick={() => goTo(Math.max(0, step - 1))} disabled={step === 0}><ChevronLeft size={16} /> Back</button>
+        {step < last
+          ? <button type="submit" className="dhl-admin-button primary">Next <ChevronRight size={16} /></button>
+          : <button type="submit" className="dhl-admin-button primary" disabled={submitting}>{submitting ? 'Working…' : submitLabel} {!submitting && <Package size={16} />}</button>}
+      </div>
     </div></form>
   </div>;
 }

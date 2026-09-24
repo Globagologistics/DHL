@@ -6,7 +6,10 @@ import { AdminContext } from '../contexts/AdminContext';
 import { supabase } from '../../lib/supabase';
 import { useChatThreads } from '../../hooks/useChat';
 import { formatTrackingNumber } from '../../services/trackingService';
-import { demoShipmentLabel } from '../../demo/demoShipment';
+import { devShipmentLabel, listDevShipments } from '../../demo/devDataStore';
+
+/** Development-store shipments counted alongside database rows (dev builds with the demo flag only). */
+const devRows = () => listDevShipments().map(item => ({ id: item.id, sender_name: item.sender_name, receiver_name: item.receiver_name, delivery_address: item.delivery_address, status: item.status, created_at: item.created_at, delivered_at: item.delivered_at || null, cancelled_at: item.cancelled_at || null }));
 
 type Period = 1 | 7 | 30;
 type ActivityShipment = { id:string; sender_name:string; receiver_name:string; delivery_address:string; status:string; created_at:string; delivered_at:string|null; cancelled_at:string|null };
@@ -36,14 +39,14 @@ export default function Admin() {
     const load = async () => {
       setLoading(true);
       const { data: auth } = await supabase.auth.getUser();
-      if (!auth.user) { if (!cancelled) setLoading(false); return; }
+      if (!auth.user) { if (!cancelled) { setRows(devRows()); setLoading(false); } return; }
       const [shipmentResult, requestResult, notificationResult] = await Promise.all([
         supabase.from('shipments').select('id,sender_name,receiver_name,delivery_address,status,created_at,delivered_at,cancelled_at').eq('admin_id',auth.user.id).order('created_at',{ascending:false}).limit(2000),
         supabase.from('shipment_requests').select('id,sender_name,recipient_name,origin,destination,created_at,status').order('created_at',{ascending:false}).limit(100),
         supabase.from('notification_deliveries').select('id,tracking_id,notification_type,delivery_status,recipient_type,created_at,sent_at').order('created_at',{ascending:false}).limit(5),
       ]);
       if (cancelled) return;
-      setRows((shipmentResult.data || []) as ActivityShipment[]);
+      setRows([...devRows(), ...((shipmentResult.data || []) as ActivityShipment[])]);
       setDataError(shipmentResult.error ? 'Shipment activity could not be loaded.' : '');
       setRequests((requestResult.data || []) as RequestPreview[]);
       setRequestsAvailable(!requestResult.error);
@@ -83,7 +86,7 @@ export default function Admin() {
   const pendingRequests = requests.filter(request => request.status === 'pending').length;
   const unreadChats = threads.reduce((sum,thread) => sum + thread.unreadForAdmin,0);
   const shipmentById = useMemo(() => new Map(shipments.map(item => [item.id,item])),[shipments]);
-  const reference = (id:string) => { const demo = demoShipmentLabel(id); if (demo) return demo; const number = shipmentById.get(id)?.trackingNumber; return number ? formatTrackingNumber(number) : id.slice(0,8).toUpperCase(); };
+  const reference = (id:string) => { const demo = devShipmentLabel(id); if (demo) return demo; const number = shipmentById.get(id)?.trackingNumber; return number ? formatTrackingNumber(number) : id.slice(0,8).toUpperCase(); };
   const kpis = [
     {label:'Total Shipments',value:rows.length,icon:Package,tone:'yellow',detail:'Across your shipment portfolio',to:'/admin/shipments'},
     {label:'Pending Requests',value:requestsAvailable?pendingRequests:'—',icon:Clock3,tone:'red',detail:requestsAvailable?'Awaiting admin review':'Request backend not installed',to:'/admin/requests'},

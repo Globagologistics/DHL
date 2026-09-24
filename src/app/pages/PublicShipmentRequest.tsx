@@ -1,18 +1,28 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CheckCircle2, Copy } from 'lucide-react';
-import ShipmentWizard, { type ShipmentDraft } from '../../features/shipment-form/ShipmentWizard';
+import { CheckCircle2, Home } from 'lucide-react';
+import ShipmentWizard from '../../features/shipment-form/ShipmentWizard';
 import { submitShipmentRequest } from '../../services/shipmentRequestService';
 
+/**
+ * Shareable public form (/shipment-request/new). Customers describe the
+ * shipment; operational details (carrier, delivery estimate, payment) are set
+ * by the admin during review. Submitting never creates a live shipment.
+ */
 export default function PublicShipmentRequest() {
-  const [submitting,setSubmitting] = useState(false);
-  const [error,setError] = useState('');
-  const [reference,setReference] = useState('');
-  const submit = async (draft:ShipmentDraft) => {
-    setSubmitting(true); setError('');
-    try { setReference(await submitShipmentRequest(draft)); }
-    catch(cause) { setError(cause instanceof Error?cause.message:'Request could not be submitted.'); }
-    finally { setSubmitting(false); }
-  };
-  return <div className="dhl-public-request"><div className="dhl-public-request-inner"><div className="dhl-admin-page-head"><div><span className="dhl-admin-eyebrow">DHL EXPRESS</span><h1>Request a shipment</h1><p>Tell us what you need to send. Our team will review the details before activation.</p></div><Link className="dhl-admin-button" to="/home">Back to Home</Link></div>{reference?<div className="dhl-admin-card dhl-admin-success"><span><CheckCircle2 size={27}/></span><h2>Shipment request submitted.</h2><p>Our team will review your shipment details before activation.</p><code>{reference}</code><div><button className="dhl-admin-button" type="button" onClick={()=>void navigator.clipboard.writeText(reference)}><Copy size={16}/> Copy reference</button><Link className="dhl-admin-button primary" to="/home">Return Home</Link></div></div>:<ShipmentWizard mode="public" onSubmit={submit} submitting={submitting} submitError={error}/>}</div></div>;
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  return <div className="dhl-public-request"><div className="dhl-public-request-inner">
+    <div className="dhl-public-request-head"><span className="dhl-eyebrow">DHL Express</span><h1>Request a shipment</h1><p>Tell us what you are sending. Our team reviews every request before it becomes an active shipment.</p></div>
+    {submitted
+      ? <div className="dhl-admin-card dhl-admin-success"><span><CheckCircle2 size={27} /></span><h2>Shipment Request Submitted</h2><p>Your shipment details have been sent for review. The shipment is not active yet; you will be contacted once it is approved.</p><div><Link className="dhl-admin-button primary" to="/home"><Home size={16} /> Return Home</Link></div></div>
+      : <ShipmentWizard mode="public" draftKey="dhl-public-request-draft" submitLabel="Submit Request" submitting={submitting} submitError={error}
+          onSubmit={async (draft, photos) => {
+            setSubmitting(true); setError('');
+            try { await submitShipmentRequest(draft, photos); setSubmitted(true); window.scrollTo({ top: 0 }); }
+            catch (cause) { setError(cause instanceof Error ? cause.message : 'Your request could not be submitted.'); }
+            finally { setSubmitting(false); }
+          }} />}
+  </div></div>;
 }

@@ -23,6 +23,8 @@ import AdminLayout from "./pages/AdminLayout";
 import AdminShipments from "./pages/AdminShipments";
 import AdminCreateShipment from "./pages/AdminCreateShipment";
 import AdminRequests from "./pages/AdminRequests";
+import AdminRequestReview from "./pages/AdminRequestReview";
+import AdminEditShipment from "./pages/AdminEditShipment";
 import PublicShipmentRequest from "./pages/PublicShipmentRequest";
 import AdminShipmentDetail from "./pages/AdminShipmentDetail";
 import AdminCustomers from "./pages/AdminCustomers";
@@ -62,8 +64,9 @@ export const router = createBrowserRouter([
               { path: "shipments", Component: AdminShipments },
               { path: "shipments/new", Component: AdminCreateShipment },
               { path: "shipments/:id", Component: AdminShipmentDetail },
-              { path: "shipments/:id/edit", Component: AdminForm },
+              { path: "shipments/:id/edit", Component: AdminEditShipment },
               { path: "requests", Component: AdminRequests },
+              { path: "requests/:id", Component: AdminRequestReview },
               { path: "customers", Component: AdminCustomers },
               { path: "chat", Component: AdminChat },
               { path: "chat/:threadId", Component: AdminChat },

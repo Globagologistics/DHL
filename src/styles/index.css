@@ -11,6 +11,7 @@
 @import './admin-chat.css';
 @import './admin-operations.css';
 @import './admin-experience.css';
+@import './workflow.css';
 
 /* Premium Animations */
 @keyframes blob {
