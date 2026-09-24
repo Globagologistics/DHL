@@ -4,6 +4,7 @@
 @import './customer.css';
 @import './entry-pages.css';
 @import './support-chat.css';
+@import './customer-experience.css';
 @import './admin.css';
 @import './admin-workflows.css';
 @import './admin-detail.css';
@@ -82,18 +83,18 @@ html {
 
 /* Selection Color */
 ::selection {
-  background-color: #2563EB;
-  color: white;
+  background-color: #FFCC00;
+  color: #191919;
 }
 
 ::-moz-selection {
-  background-color: #2563EB;
-  color: white;
+  background-color: #FFCC00;
+  color: #191919;
 }
 
 /* Focus Visible */
 *:focus-visible {
-  outline: 2px solid #2563EB;
+  outline: 2px solid #D40511;
   outline-offset: 2px;
 }
 

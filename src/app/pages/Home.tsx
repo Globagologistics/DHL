@@ -1,13 +1,14 @@
 import { Link } from 'react-router-dom';
-import { ChevronRight, Headphones, MapPin, Package, Search } from 'lucide-react';
+import { ChevronRight, Headphones, Package, Search } from 'lucide-react';
 import { TrackingForm } from '../components/customer/CustomerShell';
 import { brandConfig } from '../../config/brand';
+import { WhatsAppIcon, WhatsAppSupportButton } from '../../features/whatsapp/WhatsAppSupport';
+import { recentTrackingNumber } from '../../services/trackingService';
 
 const actions = [
   { title: 'Track Shipment', description: 'Follow your shipment’s journey', icon: Search, to: '/track', tone: 'track' },
   { title: 'Send Shipment', description: 'Access shipment services', icon: Package, to: '/send-shipment', tone: 'send' },
   { title: 'Customer Support', description: 'Get help with your delivery', icon: Headphones, to: '/chat', tone: 'support' },
-  { title: 'Service Points', description: 'Find a DHL location near you', icon: MapPin, to: '/locations', tone: 'locations' },
 ];
 
 export default function Home() {
@@ -47,6 +48,13 @@ export default function Home() {
               <ChevronRight className="dhl-action-chevron" size={17} aria-hidden="true" />
             </Link>
           ))}
+          {/* Number and message come from Admin > Settings > WhatsApp. */}
+          <WhatsAppSupportButton trackingId={recentTrackingNumber()} className="dhl-action dhl-card tone-whatsapp">
+            <span className="dhl-action-icon"><WhatsAppIcon size={21} /></span>
+            <strong>WhatsApp Support</strong>
+            <small>Continue your shipment enquiry on WhatsApp.</small>
+            <ChevronRight className="dhl-action-chevron" size={17} aria-hidden="true" />
+          </WhatsAppSupportButton>
         </div>
       </section>
     </>

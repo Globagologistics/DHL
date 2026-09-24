@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Shipment, Checkpoint, ShipmentWithCheckpoints } from '../types/database';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { resolveShipmentReference } from '../services/trackingService';
 
 // Hook to fetch all shipments for admin
 export function useAdminShipments(adminId: string) {
@@ -60,76 +61,100 @@ export function useAdminShipments(adminId: string) {
   return { shipments, loading, error };
 }
 
-// Hook to fetch shipment with checkpoints
-export function useShipmentWithCheckpoints(shipmentId: string) {
+// Hook to fetch shipment with checkpoints. Accepts the 12-digit tracking number
+// or the shipment's UUID record id. `notFound` and `error` are kept separate so
+// a failed request is never reported as a wrong tracking number.
+export function useShipmentWithCheckpoints(reference: string) {
   const [shipment, setShipment] = useState<ShipmentWithCheckpoints | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [notFound, setNotFound] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => setAttempt((value) => value + 1), []);
 
   useEffect(() => {
-    if (!shipmentId || !shipmentId.trim()) {
-      setShipment(null);
+    setShipment(null);
+    setError(null);
+    setNotFound(false);
+    if (!reference || !reference.trim()) {
       setLoading(false);
-      setError(null);
+      return;
+    }
+    const target = resolveShipmentReference(reference);
+    if (!target) {
+      setNotFound(true);
+      setLoading(false);
       return;
     }
 
+    let active = true;
+    let subscription: { unsubscribe: () => void } | null = null;
+    setLoading(true);
+
     const fetchShipment = async () => {
       try {
-        const { data: shipmentData, error: shipmentErr } = await supabase
+        const { data: rows, error: shipmentErr } = await supabase
           .from('shipments')
           .select('*')
-          .eq('id', shipmentId)
-          .single();
+          .eq(target.column, target.value)
+          .limit(1);
 
         if (shipmentErr) throw shipmentErr;
+        const shipmentData = (rows as Shipment[] | null)?.[0];
+        if (!active) return;
+        if (!shipmentData) {
+          setNotFound(true);
+          return;
+        }
 
         const { data: checkpointsData, error: checkpointsErr } = await supabase
           .from('checkpoints')
           .select('*')
-          .eq('shipment_id', shipmentId)
+          .eq('shipment_id', shipmentData.id)
           .order('checkpoint_order', { ascending: true });
 
         if (checkpointsErr) throw checkpointsErr;
+        if (!active) return;
 
         setShipment({
           ...shipmentData,
           checkpoints: checkpointsData || [],
         });
+
+        // Subscribe to real-time updates for the resolved record
+        subscription = supabase
+          .channel(`shipment-${shipmentData.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'shipments',
+              filter: `id=eq.${shipmentData.id}`,
+            },
+            (payload: RealtimePostgresChangesPayload<Shipment>) => {
+              setShipment((prev) =>
+                prev ? { ...prev, ...(payload.new as any) } : null
+              );
+            }
+          )
+          .subscribe();
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to fetch shipment');
+        if (active) setError(err instanceof Error ? err.message : 'Failed to fetch shipment');
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
     fetchShipment();
 
-    // Subscribe to real-time updates
-    const subscription = supabase
-      .channel(`shipment-${shipmentId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'shipments',
-          filter: `id=eq.${shipmentId}`,
-        },
-        (payload: RealtimePostgresChangesPayload<Shipment>) => {
-          setShipment((prev) =>
-            prev ? { ...prev, ...(payload.new as any) } : null
-          );
-        }
-      )
-      .subscribe();
-
     return () => {
-      subscription.unsubscribe();
+      active = false;
+      subscription?.unsubscribe();
     };
-  }, [shipmentId]);
+  }, [reference, attempt]);
 
-  return { shipment, loading, error };
+  return { shipment, loading, error, notFound, retry };
 }
 
 // Hook to create shipment

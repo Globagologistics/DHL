@@ -18,8 +18,31 @@ export interface Checkpoint {
   updated_at: string;
 }
 
+/** Structured wizard details stored in shipments.shipment_details (see migration 20260925000001). */
+export interface ShipmentDetails {
+  shipmentType?: 'document' | 'parcel' | 'freight' | 'other';
+  pieces?: number;
+  weightKg?: number;
+  dimensionsCm?: { length?: number; width?: number; height?: number };
+  reference?: string;
+  sender?: StructuredAddress;
+  recipient?: StructuredAddress;
+}
+
+export interface StructuredAddress {
+  company?: string;
+  address?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
 export interface Shipment {
   id: string;
+  /** Customer-facing 12-digit number. Absent until migration 20260925000000 is applied. */
+  tracking_number?: string | null;
+  shipment_details?: ShipmentDetails | null;
   admin_id: string;
   sender_name: string;
   sender_phone: string;

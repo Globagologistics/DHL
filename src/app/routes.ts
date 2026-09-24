@@ -12,6 +12,7 @@ import Locations from "./pages/Locations";
 import Solutions from "./pages/Solutions";
 import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
+import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
 import { AdminRouteGuard } from "./pages/AdminRouteGuard";
 import AdminForm from "./pages/AdminForm";
@@ -25,7 +26,6 @@ import AdminRequests from "./pages/AdminRequests";
 import PublicShipmentRequest from "./pages/PublicShipmentRequest";
 import AdminShipmentDetail from "./pages/AdminShipmentDetail";
 import AdminCustomers from "./pages/AdminCustomers";
-import AdminServicePoints from "./pages/AdminServicePoints";
 import AdminSettings from "./pages/AdminSettings";
 
 export const router = createBrowserRouter([
@@ -50,6 +50,7 @@ export const router = createBrowserRouter([
       { path: "about", Component: About },
       { path: "signin", Component: SignIn },
       { path: "signup", Component: SignUp },
+      { path: "reset-password", Component: ResetPassword },
       {
         path: "admin",
         Component: AdminRouteGuard,
@@ -68,7 +69,6 @@ export const router = createBrowserRouter([
               { path: "chat/:threadId", Component: AdminChat },
               { path: "notifications", Component: AdminNotifications },
               { path: "reports", lazy: async () => ({ Component: (await import("./pages/AdminReports")).default }) },
-              { path: "service-points", Component: AdminServicePoints },
               { path: "settings", Component: AdminSettings },
               { path: "new", Component: AdminForm },
               { path: "edit/:id", Component: AdminForm },
