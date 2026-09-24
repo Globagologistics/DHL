@@ -2,11 +2,33 @@
   command = "npm run build"
   publish = "dist"
 
+[build.environment]
+  NODE_VERSION = "20"
+
+# Public Supabase settings are not stored here. Add VITE_SUPABASE_URL and
+# VITE_SUPABASE_ANON_KEY under Site configuration → Environment variables
+# (docs/phase-2-deployment.md, step 7).
+
 [functions]
   directory = "netlify/functions"
+  node_bundler = "esbuild"
 
 [functions."notification-sweeper"]
   schedule = "*/5 * * * *"
+
+# Hashed build output (scripts, styles, map outlines, location data) never
+# changes under the same name, so browsers and phones can keep it.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
 
 [[redirects]]
   from = "/*"

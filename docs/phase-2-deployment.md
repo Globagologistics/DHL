@@ -17,7 +17,9 @@ Work through the steps in order. Each one lists what to do and how to confirm it
 
 ## 2. Apply the database schema and migrations
 
-Apply these on a **staging copy first**, then production. None of the Part One SQL has been executed against a live database.
+Apply these on a **staging copy first**, then production. None of the Part One SQL has been executed against a live Supabase project. The full sequence was applied to an empty local Postgres with Supabase's auth, storage, vault and pg_net stubbed. The publish, lifecycle, tracking, request, chat-deletion and access checks passed there.
+
+**Empty project:** paste `supabase/setup/full_setup.sql` into Supabase → SQL Editor and run it once. It contains everything below, in order, and runs as one transaction. Regenerate it with `node scripts/build-supabase-setup.mjs` after adding a migration. **Existing project:** apply only the migrations it is missing.
 
 1. `sql_schema.sql`: the base tables (users, shipments, checkpoints, chat) and legacy policies.
 2. `migrate_add_pickup_location.sql`, then `add_missing_columns.sql`: legacy column additions.
@@ -91,8 +93,7 @@ The app has one administrator. No credentials exist in source code.
 
 ## 6. Configure Netlify
 
-- Create or link the site to the new repository (step 12). Build command `npm run build`, publish directory `dist`, functions `netlify/functions` (already in `netlify.toml`).
-- Use Node 20 (`.nvmrc`).
+- Create or link the site to the new repository (step 12). `netlify.toml` already sets the build command `npm run build`, publish directory `dist`, functions `netlify/functions`, Node 20, long-lived caching for hashed `/assets/*` and basic security headers.
 - Keep the SPA redirect in `netlify.toml`.
 - Do not paste Netlify API or deploy tokens into the app. The dashboard never asks for them.
 
@@ -156,9 +157,11 @@ Admin → Settings → WhatsApp: enable it, set the country code and number, and
 ## 12. Create and push the new GitHub remote
 
 ```bash
-git remote add origin git@github.com:<org>/<repo>.git
+git remote add origin https://github.com/Globagologistics/DHL.git
 git push -u origin main
 ```
+
+In Netlify, import (or link) `Globagologistics/DHL`. The build settings come from `netlify.toml`; only the environment variables in step 7 need entering.
 
 Confirm `.env*` files are not tracked (`git ls-files | grep .env` shows only `.env.example`).
 
