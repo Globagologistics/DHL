@@ -11,6 +11,9 @@ export interface Checkpoint extends DBCheckpoint {
 
 export interface Shipment {
   id: string;
+  createdAt?: string;
+  updatedAt?: string;
+  estimatedDeliveryAt?: string | null;
   senderName: string;
   senderPhone: string;
   senderEmail?: string;
@@ -57,6 +60,7 @@ interface AdminContextType {
   togglePause: (id: string) => Promise<void>;
   deleteShipment: (id: string) => Promise<void>;
   isAdmin: boolean;
+  authChecked: boolean;
   loading: boolean;
   error: string | null;
   clearError: () => void;
@@ -70,6 +74,7 @@ export const AdminContext = createContext<AdminContextType>({
   togglePause: async () => {},
   deleteShipment: async () => {},
   isAdmin: false,
+  authChecked: false,
   loading: false,
   error: null,
   clearError: () => {},
@@ -78,6 +83,7 @@ export const AdminContext = createContext<AdminContextType>({
 export const AdminProvider = ({ children }: { children: ReactNode }) => {
   const [shipments, setShipments] = useState<Shipment[]>([]);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [adminId, setAdminId] = useState<string>('');
@@ -98,6 +104,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initializeAdmin = async () => {
       try {
+        setAuthChecked(false);
         const { data: { user }, error: authError } = await supabase.auth.getUser();
         if (authError || !user) {
           setAdminId('');
@@ -120,6 +127,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
       } catch {
         setAdminId('');
         setIsAdmin(false);
+      } finally {
+        setAuthChecked(true);
       }
     };
 
@@ -170,6 +179,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           console.log(`📦 Transforming shipment ${ship.id} with ${ship.checkpoints?.length || 0} checkpoints`);
           return {
             id: ship.id,
+            createdAt: ship.created_at,
+            updatedAt: ship.updated_at,
+            estimatedDeliveryAt: ship.estimated_delivery_at,
             senderName: ship.sender_name,
             senderPhone: ship.sender_phone,
             senderEmail: ship.sender_email,
@@ -366,6 +378,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments && refreshedShipments.length > 0) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship) => ({
             id: ship.id,
+            createdAt: ship.created_at,
+            updatedAt: ship.updated_at,
+            estimatedDeliveryAt: ship.estimated_delivery_at,
             senderName: ship.sender_name,
             senderPhone: ship.sender_phone,
             receiverName: ship.receiver_name,
@@ -470,6 +485,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            createdAt: ship.created_at,
+            updatedAt: ship.updated_at,
+            estimatedDeliveryAt: ship.estimated_delivery_at,
             senderName: ship.sender_name,
             senderPhone: ship.sender_phone,
             senderEmail: ship.sender_email,
@@ -533,6 +551,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            createdAt: ship.created_at,
+            updatedAt: ship.updated_at,
+            estimatedDeliveryAt: ship.estimated_delivery_at,
             senderName: ship.sender_name,
             senderPhone: ship.sender_phone,
             senderEmail: ship.sender_email,
@@ -622,6 +643,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            createdAt: ship.created_at,
+            updatedAt: ship.updated_at,
+            estimatedDeliveryAt: ship.estimated_delivery_at,
             senderName: ship.sender_name,
             senderPhone: ship.sender_phone,
             senderEmail: ship.sender_email,
@@ -679,6 +703,9 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            createdAt: ship.created_at,
+            updatedAt: ship.updated_at,
+            estimatedDeliveryAt: ship.estimated_delivery_at,
             senderName: ship.sender_name,
             senderPhone: ship.sender_phone,
             senderEmail: ship.sender_email,
@@ -720,6 +747,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         const errorMsg = error instanceof Error ? error.message : String(error);
         console.error('Error deleting shipment:', error);
         setError(errorMsg);
+        throw error;
       }
     },
     [adminId]
@@ -739,6 +767,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         stopShipment,
         togglePause,
         isAdmin,
+        authChecked,
         loading,
         error,
         clearError,

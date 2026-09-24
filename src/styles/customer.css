@@ -61,6 +61,8 @@
 .dhl-drawer-top { height: 72px; background: var(--dhl-yellow); display: flex; align-items: center; justify-content: space-between; padding: 0 20px; }
 .dhl-drawer-guest { display: flex; gap: 12px; align-items: center; padding: 24px 20px; border-bottom: 1px solid var(--dhl-border); }
 .dhl-drawer-guest > span { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%; background: var(--dhl-surface-secondary); }
+.dhl-guest-avatar-button { display:grid; place-items:center; flex:0 0 44px; width:44px; height:44px; padding:0; border:0; border-radius:50%; background:var(--dhl-surface-secondary); color:var(--dhl-text); cursor:pointer; }
+.dhl-guest-avatar-button:focus-visible { outline:3px solid var(--dhl-red); outline-offset:3px; }
 .dhl-drawer-guest strong,.dhl-drawer-guest small { display: block; }
 .dhl-drawer-guest small { color: var(--dhl-secondary); font-size: 12px; margin-top: 3px; }
 .dhl-drawer nav { padding: 12px; overflow-y: auto; flex: 1; }

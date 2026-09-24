@@ -7,7 +7,7 @@
   min-height: 100dvh;
   overflow: hidden;
   color: #fff;
-  background: #172a39;
+  background: #191919;
 }
 
 .dhl-welcome-cinematic .dhl-welcome-photo,
@@ -123,10 +123,10 @@
   width: 220px;
   min-height: 58px;
   margin-top: 33px;
-  border: 1px solid var(--dhl-yellow);
+  border: 1px solid var(--dhl-red);
   border-radius: 15px;
-  background: var(--dhl-yellow);
-  color: var(--dhl-ink);
+  background: var(--dhl-red);
+  color: #fff;
   font-size: 16px;
   font-weight: 800;
   box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
@@ -135,7 +135,7 @@
 }
 
 .dhl-welcome-cta:hover {
-  background: #ffda3d;
+  background: #b9040f;
   box-shadow: 0 11px 28px rgba(0, 0, 0, .3);
 }
 
@@ -149,8 +149,8 @@
 }
 
 .dhl-app-home .dhl-header {
-  background: #fff;
-  border-bottom: 1px solid var(--dhl-border);
+  background: var(--dhl-yellow);
+  border-bottom: 1px solid rgba(29, 29, 27, .1);
 }
 
 .dhl-app-home .dhl-desktop-nav a {
@@ -175,7 +175,7 @@
   height: clamp(480px, 43vw, 570px);
   overflow: hidden;
   border-radius: 28px;
-  background: #1e3240;
+  background: #191919;
   box-shadow: 0 18px 48px rgba(22, 28, 35, .15);
 }
 
@@ -224,8 +224,11 @@
 }
 
 .dhl-app-home .dhl-home-greeting strong {
-  color: var(--dhl-yellow);
+  color: var(--dhl-red);
   font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, .94);
 }
 
 .dhl-app-home .dhl-home-copy .dhl-eyebrow {
@@ -347,19 +350,21 @@
   min-height: 172px;
   gap: 8px;
   padding: 21px;
-  border: 1px solid #ecedef;
+  border: 1px solid rgba(29, 29, 27, .07);
   border-radius: 20px;
-  background: #fff;
+  background: linear-gradient(145deg, #fff, #fffdf6);
   color: var(--dhl-text);
-  box-shadow: 0 3px 14px rgba(28, 33, 39, .045);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, .05);
   transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
 }
 
 .dhl-app-home .dhl-action:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: #e3e4e5;
-  box-shadow: 0 10px 24px rgba(28, 33, 39, .1);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, .09);
 }
+
+.dhl-app-home .dhl-action:active { transform: scale(.985); }
 
 .dhl-app-home .dhl-action-icon {
   width: 44px;
@@ -368,10 +373,10 @@
   border-radius: 13px;
 }
 
-.dhl-app-home .dhl-action.tone-track .dhl-action-icon { background: #fff2b8; color: #8f3c00; }
+.dhl-app-home .dhl-action.tone-track .dhl-action-icon { background: #fff2b8; color: var(--dhl-red); }
 .dhl-app-home .dhl-action.tone-send .dhl-action-icon { background: #fdeced; color: var(--dhl-red); }
-.dhl-app-home .dhl-action.tone-support .dhl-action-icon { background: #fff5d7; color: #855500; }
-.dhl-app-home .dhl-action.tone-locations .dhl-action-icon { background: #f0f1f1; color: #555b5d; }
+.dhl-app-home .dhl-action.tone-support .dhl-action-icon { background: #fff5d7; color: var(--dhl-red); }
+.dhl-app-home .dhl-action.tone-locations .dhl-action-icon { background: #f0f1f1; color: var(--dhl-red); }
 
 .dhl-app-home .dhl-action strong {
   padding-right: 14px;
@@ -422,8 +427,8 @@
 }
 
 @keyframes dhl-cta-pulse {
-  0%, 100% { transform: scale(1); box-shadow: 0 10px 24px rgba(0, 0, 0, .22), 0 0 0 0 rgba(255, 204, 0, .35); }
-  50% { transform: scale(1.02); box-shadow: 0 10px 24px rgba(0, 0, 0, .22), 0 0 0 11px rgba(255, 204, 0, 0); }
+  0%, 100% { transform: scale(1); box-shadow: 0 10px 24px rgba(0, 0, 0, .22), 0 0 0 0 rgba(212, 5, 17, .35); }
+  50% { transform: scale(1.02); box-shadow: 0 10px 24px rgba(0, 0, 0, .22), 0 0 0 11px rgba(212, 5, 17, 0); }
 }
 
 @media (max-width: 1023px) {
@@ -497,10 +502,10 @@
   .dhl-app-home .dhl-actions h2 { font-size: 24px; }
   .dhl-actions-heading p { margin-top: 4px; font-size: 12px; }
   .dhl-app-home .dhl-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-  .dhl-app-home .dhl-action { min-height: 161px; padding: 16px; border-radius: 18px; }
-  .dhl-app-home .dhl-action-icon { width: 42px; height: 42px; margin-bottom: 4px; }
-  .dhl-app-home .dhl-action strong { font-size: 15px; }
-  .dhl-app-home .dhl-action small { font-size: 12px; }
+  .dhl-app-home .dhl-action { min-height: 156px; padding: 18px; border-radius: 18px; }
+  .dhl-app-home .dhl-action-icon { width: 44px; height: 44px; margin-bottom: 4px; }
+  .dhl-app-home .dhl-action strong { font-size: 16px; }
+  .dhl-app-home .dhl-action small { font-size: 13px; }
   .dhl-action-chevron { right: 14px; bottom: 16px; }
   .dhl-app-home .dhl-floating-support {
     right: 18px;
@@ -510,6 +515,8 @@
     height: 56px;
     padding: 0;
     border-radius: 50%;
+    background: var(--dhl-red);
+    color: #fff;
     box-shadow: 0 7px 22px rgba(112, 4, 12, .27);
   }
 }

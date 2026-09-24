@@ -1,68 +1,32 @@
-import React, { useState } from "react";
-import { Outlet } from "react-router-dom";
-import { Menu, X } from "lucide-react";
-import AdminSidebar from "../components/admin/AdminSidebar";
+import { useEffect, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { Bell, Menu, Search, Settings, UserRound } from 'lucide-react';
+import AdminSidebar from '../components/admin/AdminSidebar';
+import { environment } from '../../config/environment';
 
 export default function AdminLayout() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  return (
-    <div className="min-h-screen bg-[#0B1220] md:bg-transparent">
-      <div className="flex min-h-screen">
-        {/* Desktop Sidebar */}
-        <div className="hidden md:block">
-          <AdminSidebar />
-        </div>
-
-        {/* Mobile Header */}
-        <div className="md:hidden fixed top-0 left-0 right-0 z-40 bg-[#0B1220]/90 backdrop-blur-xl border-b border-white/10">
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">
-              Admin
-            </div>
-            <button
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              className="rounded-lg border border-white/15 bg-white/5 p-2 text-white"
-            >
-              <Menu className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Sidebar Drawer */}
-        <div
-          className={`fixed inset-0 z-50 transition ${
-            mobileOpen ? "opacity-100" : "pointer-events-none opacity-0"
-          } md:hidden`}
-        >
-          <div
-            className="absolute inset-0 bg-black/60"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div
-            className={`absolute left-0 top-0 h-full w-72 transform transition-transform ${
-              mobileOpen ? "translate-x-0" : "-translate-x-full"
-            }`}
-          >
-            <AdminSidebar onNavigate={() => setMobileOpen(false)} className="w-72" />
-            <button
-              type="button"
-              onClick={() => setMobileOpen(false)}
-              className="absolute right-4 top-4 rounded-full bg-white/10 p-2 text-white"
-            >
-              <X className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
-
-        {/* Content */}
-        <main className="flex-1 min-w-0">
-          <div className="pt-16 md:pt-0">
-            <Outlet />
-          </div>
-        </main>
-      </div>
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => setDrawerOpen(false), [location.pathname]);
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const close = (event: KeyboardEvent) => { if (event.key === 'Escape') setDrawerOpen(false); };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [drawerOpen]);
+  return <div className="dhl-admin-app">
+    <div className="dhl-admin-sidebar-desktop"><AdminSidebar /></div>
+    <div className={`dhl-admin-drawer-layer${drawerOpen ? ' open' : ''}`} aria-hidden={!drawerOpen}><button className="dhl-admin-drawer-scrim" type="button" onClick={() => setDrawerOpen(false)} tabIndex={drawerOpen ? 0 : -1} aria-label="Close admin navigation" /><AdminSidebar onNavigate={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)} /></div>
+    <div className="dhl-admin-workspace">
+      <header className="dhl-admin-topbar">
+        <button type="button" className="dhl-admin-menu-toggle" onClick={() => setDrawerOpen(true)} aria-label="Open admin navigation"><Menu size={21} /></button>
+        <div className="dhl-admin-topbar-title"><span>OPERATIONS</span><strong>DHL Express</strong></div>
+        <form className="dhl-admin-global-search" onSubmit={event => { event.preventDefault(); navigate(`/admin/shipments?search=${encodeURIComponent(query.trim())}`); }} role="search"><Search size={18} aria-hidden="true" /><input value={query} onChange={event => setQuery(event.target.value)} aria-label="Search shipments" placeholder="Search shipments, customers, tracking numbers..." /><kbd>↵</kbd></form>
+        <div className="dhl-admin-top-actions"><span className="dhl-admin-live"><i /> Live operations</span><Link to="/admin/notifications" aria-label="Notifications"><Bell size={19} /></Link><Link to="/admin/settings" aria-label="Settings"><Settings size={19} /></Link><Link className="dhl-admin-top-avatar" to="/admin/settings" aria-label="Admin profile"><UserRound size={18} /></Link></div>
+      </header>
+      <main className="dhl-admin-main">{environment.devAdminBypass && <p className="dhl-admin-dev-banner">Development view only — authenticated backend operations remain protected.</p>}<Outlet /></main>
     </div>
-  );
+  </div>;
 }

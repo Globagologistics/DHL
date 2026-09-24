@@ -14,12 +14,19 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import NotFound from "./pages/NotFound";
 import { AdminRouteGuard } from "./pages/AdminRouteGuard";
-import Admin from "./pages/Admin";
 import AdminForm from "./pages/AdminForm";
 import AdminDetail from "./pages/AdminDetail";
 import AdminChat from "./pages/AdminChat";
 import AdminNotifications from "./pages/AdminNotifications";
 import AdminLayout from "./pages/AdminLayout";
+import AdminShipments from "./pages/AdminShipments";
+import AdminCreateShipment from "./pages/AdminCreateShipment";
+import AdminRequests from "./pages/AdminRequests";
+import PublicShipmentRequest from "./pages/PublicShipmentRequest";
+import AdminShipmentDetail from "./pages/AdminShipmentDetail";
+import AdminCustomers from "./pages/AdminCustomers";
+import AdminServicePoints from "./pages/AdminServicePoints";
+import AdminSettings from "./pages/AdminSettings";
 
 export const router = createBrowserRouter([
   {
@@ -37,6 +44,7 @@ export const router = createBrowserRouter([
       { path: "chat", Component: UserChat },
       { path: "settings", Component: Settings },
       { path: "send-shipment", Component: SendShipment },
+      { path: "shipment-request/new", Component: PublicShipmentRequest },
       { path: "locations", Component: Locations },
       { path: "solutions", Component: Solutions },
       { path: "about", Component: About },
@@ -49,9 +57,19 @@ export const router = createBrowserRouter([
           {
             Component: AdminLayout,
             children: [
-              { index: true, Component: Admin },
+              { index: true, lazy: async () => ({ Component: (await import("./pages/Admin")).default }) },
+              { path: "shipments", Component: AdminShipments },
+              { path: "shipments/new", Component: AdminCreateShipment },
+              { path: "shipments/:id", Component: AdminShipmentDetail },
+              { path: "shipments/:id/edit", Component: AdminForm },
+              { path: "requests", Component: AdminRequests },
+              { path: "customers", Component: AdminCustomers },
               { path: "chat", Component: AdminChat },
+              { path: "chat/:threadId", Component: AdminChat },
               { path: "notifications", Component: AdminNotifications },
+              { path: "reports", lazy: async () => ({ Component: (await import("./pages/AdminReports")).default }) },
+              { path: "service-points", Component: AdminServicePoints },
+              { path: "settings", Component: AdminSettings },
               { path: "new", Component: AdminForm },
               { path: "edit/:id", Component: AdminForm },
               { path: "view/:id", Component: AdminDetail },

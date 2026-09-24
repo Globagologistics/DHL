@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronRight, Headphones, Home, MapPin, Menu, MoreHorizontal, Package, Search, Settings, ShieldQuestion, Truck, UserRound, X } from 'lucide-react';
 import { appConfig } from '../../../config/app';
+import { environment } from '../../../config/environment';
 
 const links = [
   { label: 'Home', path: '/home', icon: Home },
@@ -14,15 +15,31 @@ const links = [
   { label: 'Help Center', path: '/chat', icon: ShieldQuestion },
 ];
 
-export function BrandLogo() {
-  return <Link to={appConfig.routes.home} aria-label={`${appConfig.brand.appName} home`} className="dhl-brand-link"><img src={appConfig.brand.logo} alt={appConfig.brand.appName} /></Link>;
+export function BrandLogo({ unboxed = false }: { unboxed?: boolean }) {
+  return <Link to={appConfig.routes.home} aria-label={`${appConfig.brand.appName} home`} className="dhl-brand-link"><img src={unboxed ? appConfig.brand.cinematicLogo : appConfig.brand.logo} alt={appConfig.brand.appName} /></Link>;
 }
 
 export function CustomerShell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const special = location.pathname === '/' || location.pathname === '/chat';
+  const adminShortcut = useRef<{ count: number; timer: number | null }>({ count: 0, timer: null });
+  useEffect(() => () => { if (adminShortcut.current.timer !== null) window.clearTimeout(adminShortcut.current.timer); }, []);
+  const tapGuestIcon = () => {
+    if (!environment.enableAdminShortcut) return;
+    const state = adminShortcut.current;
+    if (state.count === 0) state.timer = window.setTimeout(() => { state.count = 0; state.timer = null; }, 5000);
+    state.count += 1;
+    if (state.count >= 10) {
+      if (state.timer !== null) window.clearTimeout(state.timer);
+      state.count = 0;
+      state.timer = null;
+      setDrawerOpen(false);
+      navigate('/admin');
+    }
+  };
+  const isWelcome = location.pathname === '/';
+  const special = isWelcome || location.pathname === '/chat';
   const isHome = location.pathname === '/home';
   useEffect(() => setDrawerOpen(false), [location.pathname]);
   useEffect(() => {
@@ -34,26 +51,26 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
   return <div className={`dhl-app${isHome ? ' dhl-app-home' : ''}`}>
     {!special && <header className="dhl-header"><div className="dhl-header-inner">
       <button className="dhl-icon-button dhl-menu-button" onClick={() => setDrawerOpen(true)} aria-label="Open navigation"><Menu size={22}/></button>
-      <BrandLogo/>
+      <BrandLogo unboxed={isHome}/>
       <nav className="dhl-desktop-nav" aria-label="Main navigation">
         {isHome ? <><Link to="/track">Track Shipment</Link><Link to="/send-shipment">Send Shipment</Link><Link to="/locations">Service Points</Link><Link to="/chat">Support</Link></> : <><Link to="/home">Home</Link><Link to="/track">Track</Link><Link to="/send-shipment">Send a Shipment</Link><Link to="/chat">Support</Link></>}
       </nav>
       <div className="dhl-header-actions"><Link className="dhl-icon-button" to="/settings#notifications" aria-label="Notifications"><Bell size={20}/></Link><Link className="dhl-signin" to="/signin"><UserRound size={17}/> Sign in</Link></div>
     </div></header>}
     <main className={special ? 'dhl-main dhl-main-special' : 'dhl-main'}>{children}</main>
-    {!special && <>
-      <button className="dhl-floating-support" onClick={() => navigate('/chat')} aria-label="Customer support"><Headphones size={20}/><span>Support</span></button>
+    {!special && <button className="dhl-floating-support" onClick={() => navigate('/chat')} aria-label="Customer support"><Headphones size={20}/><span>Support</span></button>}
+    {!isWelcome &&
       <nav className="dhl-bottom-nav" aria-label="Mobile navigation">
         <Link className={location.pathname === '/home' ? 'active' : ''} to="/home"><Home size={22}/><span>Home</span></Link>
         <Link className={location.pathname.startsWith('/track') ? 'active' : ''} to="/track"><Search size={22}/><span>Track</span></Link>
-        <Link to="/chat"><Headphones size={22}/><span>Support</span></Link>
+        <Link className={location.pathname === '/chat' ? 'active' : ''} to="/chat"><Headphones size={22}/><span>Support</span></Link>
         <button onClick={() => setDrawerOpen(true)}><MoreHorizontal size={22}/><span>More</span></button>
       </nav>
-    </>}
+    }
     <div className={`dhl-drawer-layer ${drawerOpen ? 'open' : ''}`} aria-hidden={!drawerOpen}>
       <button className="dhl-drawer-scrim" onClick={() => setDrawerOpen(false)} tabIndex={drawerOpen ? 0 : -1} aria-label="Close navigation"/>
       <aside className="dhl-drawer" aria-label="Navigation drawer"><div className="dhl-drawer-top"><BrandLogo/><button className="dhl-icon-button" onClick={() => setDrawerOpen(false)} aria-label="Close navigation"><X size={22}/></button></div>
-        <div className="dhl-drawer-guest"><span><UserRound size={22}/></span><div><strong>Guest</strong><small>Track and manage your shipments</small></div></div>
+        <div className="dhl-drawer-guest"><button type="button" className="dhl-guest-avatar-button" onClick={tapGuestIcon} aria-label="Guest profile"><UserRound size={22}/></button><div><strong>Guest</strong><small>Track and manage your shipments</small></div></div>
         <nav>{links.map(({ label, path, icon: Icon }) => <Link key={label} to={path} onClick={() => setDrawerOpen(false)}><span className="dhl-drawer-link-icon"><Icon size={18}/></span><span>{label}</span><ChevronRight size={16}/></Link>)}</nav>
         <Link className="dhl-drawer-signin" to="/signin" onClick={() => setDrawerOpen(false)}><UserRound size={18}/> Sign in</Link>
       </aside>

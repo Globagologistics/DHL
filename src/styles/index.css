@@ -3,6 +3,12 @@
 @import './theme.css';
 @import './customer.css';
 @import './entry-pages.css';
+@import './support-chat.css';
+@import './admin.css';
+@import './admin-workflows.css';
+@import './admin-detail.css';
+@import './admin-chat.css';
+@import './admin-operations.css';
 
 /* Premium Animations */
 @keyframes blob {

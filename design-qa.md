@@ -1,4 +1,4 @@
-# Onboarding and Home visual QA
+# Onboarding, Home, Support, and Chat visual QA
 
 **final result: blocked**
 
@@ -7,10 +7,10 @@ The requested presentation changes are implemented, but browser-rendered visual 
 ## Evidence and comparison target
 
 - Source visual truth: `C:/Users/USER/Downloads/ChatGPT Image Sep 24, 2026, 11_36_07 AM.png` (portrait, 941 × 1672 pixels) and `C:/Users/USER/Downloads/ChatGPT Image Sep 24, 2026, 11_36_25 AM.png` (landscape, 1672 × 941 pixels), plus the user's written layout brief.
-- Implementation: `/` and `/home` at `http://localhost:5194`.
-- Intended comparison viewports: 390 × 844, 430px wide mobile, portrait and wide tablet, and desktop.
+- Implementation: `/`, `/home`, and `/chat` at `http://localhost:5194`.
+- Intended comparison viewports: 390 × 844, 430px wide mobile, 768px, 1024px, and 1440px.
 - Implementation screenshot path, pixels, CSS size, and device scale: unavailable because browser capture is unavailable.
-- State: default welcome and guest Home screens. No authenticated state was required for these changes.
+- State: default welcome and guest Home screens, Support gate, and local-only `TEST123` demo chat. The real chat still depends on the existing backend authorization policy.
 
 ## Visual assessment still required
 
@@ -18,11 +18,12 @@ No full-view or focused-region side-by-side comparison was possible. In particul
 
 ## Checks completed
 
-- `npm run typecheck`: passed.
-- `npm run build`: passed.
-- `/`, `/home`, and both WebP image URLs: HTTP 200 from the local development server.
-- Existing tracking form submit handler, application routes, and backend logic were not changed.
+- `npm run typecheck`: passed using Node 20.20.2.
+- `npm run build`: passed using Node 20.20.2 (Browserslist age warning only).
+- `/chat`: HTTP 200 from the local development server on port 5194; the server process uses Node 20.20.2.
+- Local `.env.development.local` contains only `VITE_DEMO_SUPPORT_ACCESS=true`; the file is git-ignored. Production bundles use `import.meta.env.DEV &&` and cannot enable the demo bypass.
+- Existing tracking form submit handler, application routes, Supabase chat services, database policy, and admin logic were not changed.
 
 ## Next visual pass
 
-Capture onboarding and Home at 390 × 844, 430px, 768px, 1024px, and 1440px. Compare each capture with the supplied image composition and written brief; inspect focus, Get Started, tracking submit, navigation drawer, floating support, and browser console. Resolve any P0/P1/P2 findings before marking this QA passed.
+Capture onboarding, Home, Support gate, and both demo/real chat at 390 × 844, 430px, 768px, 1024px, and 1440px. Compare each capture with the supplied image composition and written brief; inspect focus, Get Started, tracking submit, navigation drawer, floating support, debounce states, composer, and browser console. Resolve any P0/P1/P2 findings before marking this QA passed.

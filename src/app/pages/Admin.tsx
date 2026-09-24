@@ -1,348 +1,91 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Copy, Check, Plus, Search, Filter, Eye, Edit2, Trash2, Truck, Package, AlertCircle, ArrowLeft } from 'lucide-react';
-import { motion } from 'motion/react';
-import { AdminContext, type Shipment, type Checkpoint } from '../contexts/AdminContext';
+import { useContext, useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Activity, ArrowUpRight, Clock3, Headphones, Package, Plus, Truck, CheckCircle2 } from 'lucide-react';
+import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { AdminContext } from '../contexts/AdminContext';
+import { supabase } from '../../lib/supabase';
+import { useChatThreads } from '../../hooks/useChat';
+
+type Period = 1 | 7 | 30;
+type ActivityShipment = { id:string; sender_name:string; receiver_name:string; delivery_address:string; status:string; created_at:string; delivered_at:string|null; cancelled_at:string|null };
+type RequestPreview = { id:string; sender_name:string; recipient_name:string; origin:string; destination:string; created_at:string; status:string };
+
+const inTransit = new Set(['picked_up','in_transit','customs_processing','out_for_delivery']);
+const pending = new Set(['processing','pickup_scheduled','paused','on_hold']);
+const statusClass = (status:string) => status === 'delivered' ? 'delivered' : status === 'cancelled' || status === 'delayed' || status === 'stopped' ? 'alert' : inTransit.has(status) ? 'transit' : 'pending';
+const formatStatus = (status:string) => status.replaceAll('_',' ').replace(/\b\w/g, letter => letter.toUpperCase());
+const shortDate = (date:string) => new Date(date).toLocaleDateString(undefined,{month:'short',day:'numeric'});
 
 export default function Admin() {
-  const { shipments, deleteShipment, loading } = useContext(AdminContext);
-  const navigate = useNavigate();
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'paused' | 'stopped'>('all');
+  const { shipments, loading: shipmentLoading } = useContext(AdminContext);
+  const { threads } = useChatThreads();
+  const [period, setPeriod] = useState<Period>(7);
+  const [rows, setRows] = useState<ActivityShipment[]>([]);
+  const [requests, setRequests] = useState<RequestPreview[]>([]);
+  const [requestsAvailable, setRequestsAvailable] = useState(true);
+  const [dataError, setDataError] = useState('');
+  const [loading, setLoading] = useState(true);
 
-  // Live progress updates
-  const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const interval = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(interval);
-  }, []);
+    let cancelled = false;
+    const load = async () => {
+      setLoading(true);
+      const { data: auth } = await supabase.auth.getUser();
+      if (!auth.user) { if (!cancelled) setLoading(false); return; }
+      const [shipmentResult, requestResult] = await Promise.all([
+        supabase.from('shipments').select('id,sender_name,receiver_name,delivery_address,status,created_at,delivered_at,cancelled_at').eq('admin_id',auth.user.id).order('created_at',{ascending:false}).limit(2000),
+        supabase.from('shipment_requests').select('id,sender_name,recipient_name,origin,destination,created_at,status').order('created_at',{ascending:false}).limit(100),
+      ]);
+      if (cancelled) return;
+      setRows((shipmentResult.data || []) as ActivityShipment[]);
+      setDataError(shipmentResult.error ? 'Shipment activity could not be loaded.' : '');
+      setRequests((requestResult.data || []) as RequestPreview[]);
+      setRequestsAvailable(!requestResult.error);
+      setLoading(false);
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [shipments]);
 
-  // Filter and search shipments
-  const filteredShipments = shipments.filter((s) => {
-    const matchesSearch = 
-      s.packageName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      s.senderName?.toLowerCase().includes(searchQuery.toLowerCase());
-    
-    const matchesFilter = 
-      filterStatus === 'all' ||
-      (filterStatus === 'active' && !s.stopped && !s.paused) ||
-      (filterStatus === 'paused' && s.paused && !s.stopped) ||
-      (filterStatus === 'stopped' && s.stopped);
-
-    return matchesSearch && matchesFilter;
-  });
-
-  // Calculate stats
-  const stats = {
-    total: shipments.length,
-    active: shipments.filter(s => !s.stopped && !s.paused).length,
-    paused: shipments.filter(s => s.paused && !s.stopped).length,
-    stopped: shipments.filter(s => s.stopped).length,
-  };
-
-  const handleCopyTrackingId = (trackingId: string) => {
-    navigator.clipboard.writeText(trackingId);
-    setCopiedId(trackingId);
-    setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const getStatusColor = (shipment: Shipment) => {
-    if (shipment.terminated) return { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-100 text-red-800' };
-    if (shipment.stopped) return { bg: 'bg-red-50', text: 'text-red-700', badge: 'bg-red-100 text-red-800' };
-    if (shipment.paused) return { bg: 'bg-yellow-50', text: 'text-yellow-700', badge: 'bg-yellow-100 text-yellow-800' };
-    return { bg: 'bg-green-50', text: 'text-green-700', badge: 'bg-green-100 text-green-800' };
-  };
-
-  const getStatusLabel = (shipment: Shipment) => {
-    if (shipment.terminated) return 'Terminated';
-    if (shipment.stopped) return 'Stopped';
-    if (shipment.paused) return 'Paused';
-    return 'Active';
-  };
-
-  const getShipmentProgress = (shipment: Shipment) => {
-    if (!shipment?.countdownStartTime || !shipment?.countdownDuration) return 0;
-    const startMs = new Date(shipment.countdownStartTime).getTime();
-    const totalMs = (shipment.countdownDuration || 0) * 3600 * 1000;
-    if (!Number.isFinite(totalMs) || totalMs <= 0) return 0;
-
-    const freezeAt =
-      shipment.terminated
-        ? shipment.terminateTimestamp
-        : shipment.stopped
-        ? shipment.stopTimestamp
-        : shipment.paused
-        ? shipment.pauseTimestamp
-        : null;
-
-    const asOfMs = freezeAt ? new Date(freezeAt).getTime() : now;
-    if (!Number.isFinite(asOfMs)) return 0;
-    const elapsed = asOfMs - startMs;
-    if (elapsed <= 0) return 0;
-    if (elapsed >= totalMs) return 100;
-    return Math.round((elapsed / totalMs) * 100);
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100 pt-24 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-          <div>
-            <h1 className="text-4xl font-bold text-[#0F1F3D]">Admin Dashboard</h1>
-            <p className="text-gray-600 mt-2">Manage and track all shipments</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <motion.button
-              whileHover={{ scale: 1.03 }}
-              whileTap={{ scale: 0.96 }}
-              onClick={() => navigate('/')}
-              className="flex items-center gap-2 px-5 py-3 rounded-lg border border-gray-300 bg-white text-[#0F1F3D] font-semibold hover:shadow-sm transition-all"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Back to Home
-            </motion.button>
-            <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => navigate('/admin/new')}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#2563EB] to-[#38BDF8] text-white rounded-lg font-semibold hover:shadow-lg transition-all"
-            >
-              <Plus className="w-5 h-5" />
-              New Shipment
-            </motion.button>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[
-            { label: 'Total Shipments', value: stats.total, icon: Package, color: 'from-blue-500 to-blue-600' },
-            { label: 'Active', value: stats.active, icon: Truck, color: 'from-green-500 to-green-600' },
-            { label: 'Paused', value: stats.paused, icon: AlertCircle, color: 'from-yellow-500 to-yellow-600' },
-            { label: 'Stopped', value: stats.stopped, icon: AlertCircle, color: 'from-red-500 to-red-600' },
-          ].map((stat, idx) => (
-            <motion.div
-              key={idx}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: idx * 0.1 }}
-              className={`bg-gradient-to-br ${stat.color} rounded-xl p-6 text-white shadow-lg`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-white/80 text-sm font-medium">{stat.label}</p>
-                  <p className="text-4xl font-bold mt-2">{stat.value}</p>
-                </div>
-                <stat.icon className="w-12 h-12 opacity-30" />
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Search and Filter */}
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-lg shadow-md p-4 mb-6 border border-gray-200"
-        >
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-3 w-5 h-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by package name, ID, or sender..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#2563EB]"
-              />
-            </div>
-            <div className="flex gap-2 sm:flex-1 lg:flex-none">
-              <Filter className="w-5 h-5 text-gray-500 my-auto" />
-              <div className="flex gap-2">
-                {(['all', 'active', 'paused', 'stopped'] as const).map((status) => (
-                  <button
-                    key={status}
-                    onClick={() => setFilterStatus(status)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all ${
-                      filterStatus === status
-                        ? 'bg-[#2563EB] text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
-                  >
-                    {status.charAt(0).toUpperCase() + status.slice(1)}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Shipments Grid */}
-        <div className="space-y-4">
-          {loading && (
-            <div className="text-center py-12">
-              <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#2563EB]"></div>
-              <p className="text-gray-600 mt-4">Loading shipments...</p>
-            </div>
-          )}
-
-          {!loading && filteredShipments.length === 0 ? (
-            <div className="bg-white rounded-xl shadow-md p-12 text-center border border-gray-200">
-              <Package className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-600 text-lg font-medium">No shipments found</p>
-              <p className="text-gray-500 mt-2">
-                {searchQuery || filterStatus !== 'all' 
-                  ? 'Try adjusting your search or filters.' 
-                  : 'Create your first shipment to get started.'}
-              </p>
-            </div>
-          ) : (
-            filteredShipments.map((s, idx) => {
-              const statusColor = getStatusColor(s);
-              const progress = getShipmentProgress(s);
-
-              return (
-                <motion.div
-                  key={s.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  className={`${statusColor.bg} rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 overflow-hidden`}
-                >
-                  <div className="p-6">
-                    <div className="flex flex-col lg:flex-row justify-between gap-4">
-                      {/* Shipment Info */}
-                      <div className="flex-1 space-y-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1">
-                            <h3 className="text-xl font-bold text-[#0F1F3D]">{s.packageName || 'Unnamed Package'}</h3>
-                            <div className={`inline-block px-3 py-1 rounded-full text-xs font-semibold ${statusColor.badge} mt-2`}>
-                              {getStatusLabel(s)}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Shipment Details */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                          <div>
-                            <p className="text-gray-600 font-medium">From</p>
-                            <p className="text-[#0F1F3D] font-semibold truncate">{s.senderName || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-600 font-medium">To</p>
-                            <p className="text-[#0F1F3D] font-semibold truncate">{s.receiverName || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-600 font-medium">Transport</p>
-                            <p className="text-[#0F1F3D] font-semibold">{s.transportation || 'N/A'}</p>
-                          </div>
-                          <div>
-                            <p className="text-gray-600 font-medium">Cost</p>
-                            <p className="text-[#0F1F3D] font-semibold">${s.cost?.toFixed(2) || '0.00'}</p>
-                          </div>
-                        </div>
-
-                        {/* Tracking ID */}
-                        <div className="flex items-center gap-2 pt-2">
-                          <span className="text-xs text-gray-600 font-mono bg-white/50 px-3 py-1 rounded">ID: {s.id.slice(0, 12)}...</span>
-                          <button
-                            onClick={() => handleCopyTrackingId(s.id)}
-                            className="p-1 hover:bg-white/50 rounded transition-colors"
-                          >
-                            {copiedId === s.id ? (
-                              <Check className="w-4 h-4 text-green-600" />
-                            ) : (
-                              <Copy className="w-4 h-4 text-gray-500" />
-                            )}
-                          </button>
-                        </div>
-
-                        {/* Progress Bar */}
-                        {s.countdownStartTime && s.countdownDuration && (
-                          <div className="pt-2">
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs font-medium text-gray-700">Progress</span>
-                              <span className="text-xs font-semibold text-gray-700">{progress}%</span>
-                            </div>
-                            <div className="w-full h-2 bg-white/60 rounded-full overflow-hidden">
-                              <motion.div
-                                className="h-full bg-gradient-to-r from-[#2563EB] to-[#38BDF8]"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${progress}%` }}
-                                transition={{ duration: 0.5 }}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Checkpoints */}
-                        {s.checkpoints && s.checkpoints.length > 0 && (
-                          <div className="pt-2">
-                            <p className="text-xs font-medium text-gray-700 mb-2">Route ({s.checkpoints.length} stops)</p>
-                            <div className="flex h-3 gap-1 rounded-full overflow-hidden bg-white/40">
-                              {s.checkpoints.map((c: Checkpoint, idx: number) => (
-                                <div
-                                  key={c.id}
-                                  className={`flex-1 ${
-                                    idx <= (s.currentCheckpointIndex || 0)
-                                      ? 'bg-gradient-to-r from-[#2563EB] to-[#38BDF8]'
-                                      : 'bg-white/50'
-                                  }`}
-                                  title={c.location}
-                                />
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Actions */}
-                      <div className="flex gap-2 lg:flex-col justify-end">
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => navigate(`/admin/view/${s.id}`)}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-                        >
-                          <Eye className="w-4 h-4" />
-                          <span className="hidden sm:inline">View</span>
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => navigate(`/admin/edit/${s.id}`)}
-                          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
-                        >
-                          <Edit2 className="w-4 h-4" />
-                          <span className="hidden sm:inline">Edit</span>
-                        </motion.button>
-                        <motion.button
-                          whileHover={{ scale: 1.05 }}
-                          whileTap={{ scale: 0.95 }}
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to delete this shipment?')) {
-                              deleteShipment(s.id);
-                            }
-                          }}
-                          className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                          <span className="hidden sm:inline">Delete</span>
-                        </motion.button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })
-          )}
-        </div>
-      </div>
-    </div>
-  );
+  const periodRows = useMemo(() => {
+    const since = Date.now() - period * 86400000;
+    return rows.filter(row => new Date(row.created_at).getTime() >= since);
+  }, [rows,period]);
+  const chartData = useMemo(() => {
+    const today = new Date();
+    const days = Array.from({length:period},(_,i) => {
+      const date = new Date(today); date.setHours(0,0,0,0); date.setDate(date.getDate()-(period-1-i));
+      return { key:date.toISOString().slice(0,10), label:date.toLocaleDateString(undefined,{month:'short',day:'numeric'}), Created:0, Delivered:0, Cancelled:0 };
+    });
+    const byKey = new Map(days.map(day => [day.key,day]));
+    rows.forEach(row => {
+      const created = byKey.get(row.created_at.slice(0,10)); if (created) created.Created++;
+      const delivered = row.delivered_at && byKey.get(row.delivered_at.slice(0,10)); if (delivered) delivered.Delivered++;
+      const cancelled = row.cancelled_at && byKey.get(row.cancelled_at.slice(0,10)); if (cancelled) cancelled.Cancelled++;
+    });
+    return days;
+  },[rows,period]);
+  const distribution = useMemo(() => [
+    {name:'Delivered',value:periodRows.filter(row => row.status === 'delivered').length,color:'#2e9b50'},
+    {name:'In Transit',value:periodRows.filter(row => inTransit.has(row.status)).length,color:'#ffcc00'},
+    {name:'Pending',value:periodRows.filter(row => pending.has(row.status)).length,color:'#85898f'},
+    {name:'Cancelled',value:periodRows.filter(row => row.status === 'cancelled').length,color:'#d40511'},
+    {name:'Other',value:periodRows.filter(row => !inTransit.has(row.status) && !pending.has(row.status) && row.status !== 'delivered' && row.status !== 'cancelled').length,color:'#3178c6'},
+  ].filter(item => item.value > 0),[periodRows]);
+  const pendingRequests = requests.filter(request => request.status === 'pending').length;
+  const unreadChats = threads.reduce((sum,thread) => sum + thread.unreadForAdmin,0);
+  const kpis = [
+    {label:'Total Shipments',value:rows.length,icon:Package,tone:'yellow',detail:'Across your shipment portfolio'},
+    {label:'Pending Requests',value:requestsAvailable?pendingRequests:'—',icon:Clock3,tone:'red',detail:requestsAvailable?'Awaiting admin review':'Request backend not installed'},
+    {label:'In Transit',value:rows.filter(row => inTransit.has(row.status)).length,icon:Truck,tone:'yellow',detail:'Moving through the network'},
+    {label:'Delivered',value:rows.filter(row => row.status === 'delivered').length,icon:CheckCircle2,tone:'green',detail:'Completed shipments'},
+    {label:'Support Conversations',value:threads.length,icon:Headphones,tone:'neutral',detail:`${unreadChats} unread messages`},
+  ];
+  return <div className="dhl-admin-dashboard">
+    <div className="dhl-admin-page-head"><div><span className="dhl-admin-eyebrow"><Activity size={14} /> LIVE OVERVIEW</span><h1>Dashboard</h1><p>Real-time overview of your logistics operations.</p></div><div className="dhl-admin-page-actions"><div className="dhl-admin-period" aria-label="Date range">{([1,7,30] as Period[]).map(value => <button key={value} type="button" className={period===value?'active':''} onClick={() => setPeriod(value)}>{value===1?'Today':`${value} Days`}</button>)}</div><Link className="dhl-admin-button primary" to="/admin/shipments/new"><Plus size={16} /> Create Shipment</Link></div></div>
+    {dataError && <p className="dhl-admin-banner error" role="alert">{dataError}</p>}
+    <div className="dhl-admin-kpis">{kpis.map(({label,value,icon:Icon,tone,detail}) => <div className="dhl-admin-kpi dhl-admin-card" key={label}><div className="dhl-admin-kpi-top"><span className={`dhl-admin-kpi-icon ${tone}`}><Icon size={19} /></span><ArrowUpRight size={15} className="dhl-admin-kpi-arrow" /></div><strong>{loading||shipmentLoading?'…':value}</strong><span>{label}</span><small>{detail}</small></div>)}</div>
+    <div className="dhl-admin-chart-grid"><section className="dhl-admin-card"><div className="dhl-admin-card-head"><div><h2>Shipment activity</h2><p>Created, delivered and cancelled by day</p></div><span className="dhl-admin-mini-live"><i /> Operational data</span></div><div className="dhl-admin-chart-area">{rows.length ? <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{top:10,right:10,bottom:0,left:-20}}><CartesianGrid vertical={false} stroke="#edf0f1" /><XAxis dataKey="label" tickLine={false} axisLine={false} tick={{fill:'#85898f',fontSize:10}} interval={period===30?4:0} /><YAxis allowDecimals={false} tickLine={false} axisLine={false} tick={{fill:'#85898f',fontSize:10}} /><Tooltip /><Bar dataKey="Created" fill="#ffcc00" radius={[4,4,0,0]} maxBarSize={22} /><Bar dataKey="Delivered" fill="#2e9b50" radius={[4,4,0,0]} maxBarSize={22} /><Bar dataKey="Cancelled" fill="#d40511" radius={[4,4,0,0]} maxBarSize={22} /></BarChart></ResponsiveContainer>:<div className="dhl-admin-empty"><Activity size={24}/><strong>No shipment activity yet</strong><span>Activity appears once shipments are created.</span></div>}</div><div className="dhl-admin-chart-legend"><span><i className="created"/>Created</span><span><i className="delivered"/>Delivered</span><span><i className="cancelled"/>Cancelled</span></div></section><section className="dhl-admin-card"><div className="dhl-admin-card-head"><div><h2>Status distribution</h2><p>Shipments created in selected period</p></div></div><div className="dhl-admin-donut-area">{distribution.length?<><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={distribution} dataKey="value" nameKey="name" innerRadius="65%" outerRadius="89%" paddingAngle={2} stroke="none">{distribution.map(item=><Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="dhl-admin-donut-center"><strong>{periodRows.length}</strong><small>SHIPMENTS</small></div></>:<div className="dhl-admin-empty"><Package size={24}/><strong>No shipments in this period</strong></div>}</div><div className="dhl-admin-distribution-key">{distribution.map(item=><div key={item.name}><i style={{background:item.color}}/><span>{item.name}</span><strong>{item.value}</strong></div>)}</div></section></div>
+    <div className="dhl-admin-overview-grid"><section className="dhl-admin-card"><div className="dhl-admin-card-head"><h2>Recent shipments</h2><Link to="/admin/shipments">View all <ArrowUpRight size={14}/></Link></div>{rows.length?<div className="dhl-admin-table-wrap"><table className="dhl-admin-table"><thead><tr><th>Tracking ID</th><th>Customer</th><th>Status</th><th>Created</th></tr></thead><tbody>{rows.slice(0,5).map(row=><tr key={row.id}><td className="mono"><Link to={`/admin/shipments/${row.id}`}>{row.id.slice(0,8).toUpperCase()}</Link></td><td>{row.receiver_name || row.sender_name || 'Not provided'}</td><td><span className={`dhl-admin-status ${statusClass(row.status)}`}>{formatStatus(row.status)}</span></td><td>{shortDate(row.created_at)}</td></tr>)}</tbody></table></div>:<div className="dhl-admin-empty"><Package size={22}/><strong>No shipments yet</strong></div>}</section><section className="dhl-admin-card"><div className="dhl-admin-card-head"><h2>Recent requests</h2><Link to="/admin/requests">View all <ArrowUpRight size={14}/></Link></div>{!requestsAvailable?<div className="dhl-admin-empty"><Clock3 size={22}/><strong>Requests need backend setup</strong><span>Apply the shipment-request migration to enable this queue.</span></div>:requests.length?<div className="dhl-admin-compact-list">{requests.slice(0,4).map(request=><Link key={request.id} to={`/admin/requests?id=${request.id}`}><span className="dhl-admin-list-icon"><Package size={17}/></span><span><strong>{request.sender_name}</strong><small>{request.origin} → {request.destination}</small></span><span className={`dhl-admin-status ${request.status==='pending'?'transit':'pending'}`}>{formatStatus(request.status)}</span></Link>)}</div>:<div className="dhl-admin-empty"><Clock3 size={22}/><strong>No requests yet</strong><span>Customer submissions will appear here.</span></div>}</section><section className="dhl-admin-card"><div className="dhl-admin-card-head"><h2>Support conversations</h2><Link to="/admin/chat">Open inbox <ArrowUpRight size={14}/></Link></div>{threads.length?<div className="dhl-admin-compact-list">{threads.slice(0,4).map(thread=><Link key={thread.id} to={`/admin/chat/${thread.id}`}><span className="dhl-admin-list-icon red"><Headphones size={17}/></span><span><strong>{thread.trackingId.slice(0,12)}</strong><small>{thread.lastMessagePreview || 'No messages yet'}</small></span>{thread.unreadForAdmin>0&&<b className="dhl-admin-unread">{thread.unreadForAdmin}</b>}</Link>)}</div>:<div className="dhl-admin-empty"><Headphones size={22}/><strong>Inbox is clear</strong><span>New support conversations will appear here.</span></div>}</section></div>
+  </div>;
 }

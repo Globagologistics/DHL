@@ -1,9 +1,11 @@
-import React, { useContext } from 'react';
-import { Outlet } from 'react-router-dom';
-import NotFound from './NotFound';
+import { useContext } from 'react';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AdminContext } from '../contexts/AdminContext';
+import { environment } from '../../config/environment';
 
 export const AdminRouteGuard = () => {
-  const { isAdmin } = useContext(AdminContext);
-  return isAdmin ? <Outlet /> : <NotFound />;
+  const { isAdmin, authChecked } = useContext(AdminContext);
+  const location = useLocation();
+  if (!authChecked) return <div className="dhl-admin-auth-loading" role="status">Checking admin access...</div>;
+  return isAdmin || environment.devAdminBypass ? <Outlet /> : <Navigate to={`/signin?next=${encodeURIComponent(location.pathname)}`} replace />;
 };

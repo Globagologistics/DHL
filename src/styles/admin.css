@@ -1,0 +1,136 @@
+/* DHL operations console. Scoped so the customer application is unchanged. */
+.dhl-admin-app { --admin-yellow:#ffcc00; --admin-red:#d40511; --admin-ink:#191919; --admin-text:#1d1d1b; --admin-muted:#62656a; --admin-border:#e4e6e8; --admin-page:#f6f7f8; display:flex; min-height:100dvh; background:var(--admin-page); color:var(--admin-text); }
+.dhl-admin-app *, .dhl-admin-app *::before, .dhl-admin-app *::after { box-sizing:border-box; }
+.dhl-admin-sidebar-desktop { flex:0 0 244px; }
+.dhl-admin-sidebar { position:sticky; top:0; display:flex; flex-direction:column; width:244px; height:100dvh; overflow-y:auto; background:#171a1d; color:#fff; box-shadow:8px 0 30px rgba(0,0,0,.06); }
+.dhl-admin-brand { display:flex; align-items:center; justify-content:space-between; min-height:76px; padding:16px 22px; background:var(--admin-yellow); }
+.dhl-admin-brand img { display:block; width:123px; height:37px; object-fit:contain; }
+.dhl-admin-brand button { display:grid; place-items:center; width:40px; height:40px; border:0; background:transparent; color:var(--admin-ink); }
+.dhl-admin-sidebar-intro { display:grid; gap:4px; padding:25px 22px 16px; }
+.dhl-admin-sidebar-intro span { color:#8f9497; font-size:10px; font-weight:800; letter-spacing:.17em; }
+.dhl-admin-sidebar-intro strong { font-size:16px; font-weight:750; letter-spacing:-.02em; }
+.dhl-admin-navigation { display:grid; align-content:start; gap:3px; flex:1; padding:4px 11px 18px; }
+.dhl-admin-navigation a { display:flex; align-items:center; gap:12px; min-height:43px; padding:0 12px; border-radius:10px; color:#aeb3b6; font-size:13px; font-weight:650; text-decoration:none; transition:background 180ms ease,color 180ms ease; }
+.dhl-admin-navigation a svg { flex:0 0 auto; }
+.dhl-admin-navigation a:hover { background:#282d31; color:#fff; }
+.dhl-admin-navigation a.active { background:rgba(212,5,17,.17); color:#fff; box-shadow:inset 3px 0 0 var(--admin-red); }
+.dhl-admin-navigation a.active svg { color:#ff555e; }
+.dhl-admin-sidebar-bottom { position:relative; padding:11px; border-top:1px solid #303438; }
+.dhl-admin-sidebar-help { display:flex; align-items:center; gap:10px; min-height:42px; padding:0 12px; color:#aeb3b6; font-size:12px; }
+.dhl-admin-profile { display:flex; align-items:center; gap:10px; width:100%; min-height:61px; padding:9px; border:1px solid #3b4145; border-radius:12px; background:#24292d; color:#fff; text-align:left; }
+.dhl-admin-avatar { display:grid; place-items:center; flex:0 0 35px; width:35px; height:35px; border-radius:10px; background:var(--admin-yellow); color:var(--admin-ink); }
+.dhl-admin-profile-copy { display:grid; gap:1px; flex:1; }
+.dhl-admin-profile-copy strong { font-size:12px; }
+.dhl-admin-profile-copy small { color:#aeb3b6; font-size:10px; }
+.dhl-admin-profile-menu { position:absolute; bottom:78px; left:12px; right:12px; display:grid; padding:6px; border:1px solid #474d51; border-radius:12px; background:#2b3034; box-shadow:0 14px 32px rgba(0,0,0,.25); }
+.dhl-admin-profile-menu a,.dhl-admin-profile-menu button { display:block; width:100%; padding:10px; border:0; border-radius:8px; background:transparent; color:#fff; font-size:12px; text-align:left; }
+.dhl-admin-profile-menu a:hover,.dhl-admin-profile-menu button:hover { background:#3a4044; }
+.dhl-admin-drawer-layer { display:none; }
+.dhl-admin-workspace { flex:1; min-width:0; }
+.dhl-admin-topbar { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:18px; height:66px; padding:0 clamp(20px,2.2vw,34px); border-bottom:1px solid var(--admin-border); background:rgba(255,255,255,.96); backdrop-filter:blur(14px); }
+.dhl-admin-menu-toggle { display:none; place-items:center; width:42px; height:42px; border:0; border-radius:10px; background:transparent; color:var(--admin-text); }
+.dhl-admin-topbar-title { display:grid; gap:1px; min-width:145px; }
+.dhl-admin-topbar-title span { color:var(--admin-red); font-size:9px; font-weight:900; letter-spacing:.17em; }
+.dhl-admin-topbar-title strong { font-size:14px; font-weight:800; }
+.dhl-admin-global-search { display:flex; align-items:center; gap:10px; width:min(480px,44vw); height:40px; margin-left:6px; padding:0 13px; border:1px solid var(--admin-border); border-radius:10px; background:#f6f7f8; color:#777b80; }
+.dhl-admin-global-search input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:var(--admin-text); font-size:12px; }
+.dhl-admin-global-search kbd { color:#a2a6a9; font-size:15px; }
+.dhl-admin-top-actions { display:flex; align-items:center; gap:9px; margin-left:auto; }
+.dhl-admin-top-actions > a { display:grid; place-items:center; width:38px; height:38px; border-radius:10px; color:#555b60; }
+.dhl-admin-top-actions > a:hover { background:#f0f2f4; color:var(--admin-red); }
+.dhl-admin-top-avatar { border:1px solid var(--admin-border); background:#f7f7f5; }
+.dhl-admin-live { display:flex; align-items:center; gap:7px; margin-right:8px; color:#62656a; font-size:11px; font-weight:700; white-space:nowrap; }
+.dhl-admin-live i { width:7px; height:7px; border-radius:50%; background:#2e9b50; box-shadow:0 0 0 4px #edf8f0; }
+.dhl-admin-main { width:min(100%,1500px); min-height:calc(100dvh - 66px); margin:0 auto; padding:clamp(20px,2.4vw,36px); }
+.dhl-admin-auth-loading { display:grid; place-items:center; min-height:100dvh; color:#62656a; background:#f6f7f8; font-weight:700; }
+.dhl-admin-dev-banner { margin:0 0 16px; padding:10px 13px; border:1px solid #ffe09a; border-radius:10px; background:#fff8dc; color:#6d5200; font-size:12px; font-weight:700; }
+.dhl-admin-page-head { display:flex; align-items:flex-start; justify-content:space-between; gap:20px; margin-bottom:27px; }
+.dhl-admin-page-head h1 { margin:0; color:var(--admin-text); font-size:clamp(25px,2.4vw,34px); font-weight:850; letter-spacing:-.045em; line-height:1.08; }
+.dhl-admin-page-head p { margin:8px 0 0; color:var(--admin-muted); font-size:13px; }
+.dhl-admin-page-actions { display:flex; align-items:center; gap:9px; flex-wrap:wrap; }
+.dhl-admin-button { display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:41px; padding:0 15px; border:1px solid var(--admin-border); border-radius:10px; background:#fff; color:var(--admin-text); font-size:12px; font-weight:800; white-space:nowrap; cursor:pointer; transition:transform 180ms ease,box-shadow 180ms ease,background 180ms ease; }
+.dhl-admin-button:hover { transform:translateY(-1px); box-shadow:0 7px 16px rgba(0,0,0,.07); }
+.dhl-admin-button.primary { border-color:var(--admin-red); background:var(--admin-red); color:#fff; }
+.dhl-admin-button.primary:hover { background:#b9040f; }
+.dhl-admin-button.yellow { border-color:var(--admin-yellow); background:var(--admin-yellow); color:var(--admin-ink); }
+.dhl-admin-card { border:1px solid var(--admin-border); border-radius:17px; background:#fff; box-shadow:0 7px 24px rgba(27,35,42,.035); }
+.dhl-admin-card-head { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:18px 20px 14px; }
+.dhl-admin-card-head h2 { margin:0; color:var(--admin-text); font-size:15px; font-weight:800; letter-spacing:-.02em; }
+.dhl-admin-card-head a { color:var(--admin-red); font-size:11px; font-weight:800; }
+.dhl-admin-empty { display:grid; justify-items:center; gap:8px; padding:42px 18px; color:var(--admin-muted); text-align:center; font-size:13px; }
+.dhl-admin-empty svg { color:#aeb3b6; }
+.dhl-admin-empty strong { color:var(--admin-text); font-size:15px; }
+.dhl-admin-status { display:inline-flex; align-items:center; gap:6px; padding:6px 9px; border-radius:99px; background:#f0f2f4; color:#62656a; font-size:10px; font-weight:850; white-space:nowrap; }
+.dhl-admin-status::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.dhl-admin-status.delivered { background:#edf8f0; color:#2e9b50; }
+.dhl-admin-status.transit { background:#fff4ca; color:#996500; }
+.dhl-admin-status.pending { background:#f0f2f4; color:#62656a; }
+.dhl-admin-status.alert { background:#fff0ef; color:#d40511; }
+.dhl-admin-table-wrap { width:100%; overflow-x:auto; }
+.dhl-admin-table { width:100%; border-collapse:collapse; text-align:left; }
+.dhl-admin-table th { padding:12px 16px; border-top:1px solid var(--admin-border); border-bottom:1px solid var(--admin-border); background:#fafbfb; color:#85898f; font-size:10px; font-weight:850; letter-spacing:.07em; text-transform:uppercase; white-space:nowrap; }
+.dhl-admin-table td { padding:14px 16px; border-bottom:1px solid #edf0f1; color:var(--admin-text); font-size:12px; vertical-align:middle; }
+.dhl-admin-table tr:last-child td { border-bottom:0; }
+.dhl-admin-table tbody tr:hover { background:#fffdf6; }
+.dhl-admin-table .mono { font-family:ui-monospace,SFMono-Regular,Consolas,monospace; font-size:11px; font-weight:800; }
+.dhl-admin-input { min-height:42px; padding:0 13px; border:1px solid var(--admin-border); border-radius:10px; background:#fff; color:var(--admin-text); font-size:12px; }
+.dhl-admin-tabs { display:flex; align-items:center; gap:4px; overflow-x:auto; }
+.dhl-admin-tabs button,.dhl-admin-tabs a { min-height:38px; padding:0 13px; border:0; border-radius:8px; background:transparent; color:#777b80; font-size:12px; font-weight:750; white-space:nowrap; }
+.dhl-admin-tabs .active { background:#fff0ef; color:var(--admin-red); }
+.dhl-admin-app :focus-visible { outline:3px solid var(--admin-red); outline-offset:2px; }
+.dhl-admin-eyebrow { display:inline-flex; align-items:center; gap:6px; margin-bottom:10px; color:var(--admin-red); font-size:10px; font-weight:850; letter-spacing:.14em; }
+.dhl-admin-period { display:flex; gap:2px; padding:3px; border:1px solid var(--admin-border); border-radius:10px; background:#fff; }
+.dhl-admin-period button { min-height:33px; padding:0 11px; border:0; border-radius:7px; background:transparent; color:#777b80; font-size:11px; font-weight:750; white-space:nowrap; }
+.dhl-admin-period button.active { background:#191919; color:#fff; }
+.dhl-admin-banner { padding:12px 15px; margin:0 0 18px; border-radius:10px; font-size:12px; }
+.dhl-admin-banner.error { border:1px solid #f2c3c6; background:#fff2f2; color:#af0510; }
+.dhl-admin-kpis { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:13px; margin-bottom:17px; }
+.dhl-admin-kpi { display:grid; align-content:start; min-height:145px; padding:17px; }
+.dhl-admin-kpi-top { display:flex; justify-content:space-between; align-items:start; margin-bottom:13px; }
+.dhl-admin-kpi-icon { display:grid; place-items:center; width:35px; height:35px; border-radius:10px; }
+.dhl-admin-kpi-icon.yellow { background:#fff4c7; color:#8b6400; }.dhl-admin-kpi-icon.red { background:#fff0ef; color:#d40511; }.dhl-admin-kpi-icon.green { background:#edf8f0; color:#2e9b50; }.dhl-admin-kpi-icon.neutral { background:#f0f2f4; color:#62656a; }
+.dhl-admin-kpi-arrow { color:#b9bec1; }
+.dhl-admin-kpi > strong { color:#191919; font-size:clamp(23px,2.2vw,32px); font-weight:850; line-height:1.1; letter-spacing:-.05em; }
+.dhl-admin-kpi > span { margin-top:5px; color:#1d1d1b; font-size:12px; font-weight:800; }
+.dhl-admin-kpi > small { margin-top:4px; color:#85898f; font-size:10px; line-height:1.3; }
+.dhl-admin-chart-grid { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(300px,.85fr); gap:16px; margin-bottom:16px; }
+.dhl-admin-card-head p { margin:4px 0 0; color:#85898f; font-size:11px; }
+.dhl-admin-mini-live { display:flex; align-items:center; gap:6px; color:#85898f; font-size:10px; font-weight:700; }
+.dhl-admin-mini-live i { width:6px; height:6px; border-radius:50%; background:#2e9b50; }
+.dhl-admin-chart-area { height:255px; padding:10px 14px 0 4px; }
+.dhl-admin-chart-area .dhl-admin-empty { min-height:220px; align-content:center; }
+.dhl-admin-chart-legend { display:flex; gap:17px; padding:5px 20px 18px; color:#62656a; font-size:10px; }
+.dhl-admin-chart-legend span { display:flex; align-items:center; gap:6px; }
+.dhl-admin-chart-legend i,.dhl-admin-distribution-key i { width:8px; height:8px; border-radius:2px; }
+.dhl-admin-chart-legend .created { background:#ffcc00; }.dhl-admin-chart-legend .delivered { background:#2e9b50; }.dhl-admin-chart-legend .cancelled { background:#d40511; }
+.dhl-admin-donut-area { position:relative; height:210px; margin:0 20px; }
+.dhl-admin-donut-area .dhl-admin-empty { align-content:center; height:100%; }
+.dhl-admin-donut-center { position:absolute; top:50%; left:50%; display:grid; justify-items:center; transform:translate(-50%,-50%); pointer-events:none; }
+.dhl-admin-donut-center strong { font-size:30px; font-weight:850; letter-spacing:-.05em; }.dhl-admin-donut-center small { color:#85898f; font-size:9px; font-weight:800; letter-spacing:.14em; }
+.dhl-admin-distribution-key { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px 13px; padding:0 21px 19px; }
+.dhl-admin-distribution-key div { display:flex; align-items:center; gap:6px; min-width:0; color:#62656a; font-size:10px; }.dhl-admin-distribution-key span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.dhl-admin-distribution-key strong { margin-left:auto; color:#1d1d1b; }
+.dhl-admin-overview-grid { display:grid; grid-template-columns:minmax(0,1.45fr) repeat(2,minmax(0,1fr)); gap:16px; }
+.dhl-admin-card-head a { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
+.dhl-admin-compact-list { padding:0 10px 10px; }.dhl-admin-compact-list > a { display:flex; align-items:center; gap:10px; min-height:62px; padding:9px; border-top:1px solid #edf0f1; color:#1d1d1b; }.dhl-admin-compact-list > a:hover { background:#fffdf6; }.dhl-admin-compact-list > a > span:nth-child(2) { flex:1; min-width:0; }.dhl-admin-compact-list strong,.dhl-admin-compact-list small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.dhl-admin-compact-list strong { font-size:11px; }.dhl-admin-compact-list small { margin-top:3px; color:#85898f; font-size:10px; }
+.dhl-admin-list-icon { display:grid; place-items:center; flex:0 0 32px; width:32px; height:32px; border-radius:9px; background:#fff4c7; color:#9b7100; }.dhl-admin-list-icon.red { background:#fff0ef; color:#d40511; }
+.dhl-admin-unread { display:grid; place-items:center; min-width:20px; height:20px; border-radius:50%; background:#d40511; color:#fff; font-size:10px; }
+.dhl-admin-list-controls { display:flex; align-items:center; gap:15px; padding:18px 19px 10px; }
+.dhl-admin-list-search { display:flex; align-items:center; gap:9px; width:min(430px,100%); min-height:41px; padding:0 12px; border:1px solid #e4e6e8; border-radius:10px; background:#f8f9f9; color:#85898f; }
+.dhl-admin-list-search input { flex:1; min-width:0; border:0; outline:0; background:transparent; color:#1d1d1b; font-size:12px; }
+.dhl-admin-list-count { margin-left:auto; color:#85898f; font-size:11px; font-weight:700; white-space:nowrap; }
+.dhl-admin-tabs.shipment-tabs { padding:0 15px 12px; }
+.dhl-admin-shipment-table .dhl-admin-table { min-width:1020px; }
+.dhl-admin-shipment-table td { max-width:170px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.dhl-admin-shipment-table td strong,.dhl-admin-shipment-table td small { display:block; overflow:hidden; text-overflow:ellipsis; }.dhl-admin-shipment-table td small { margin-top:3px; color:#85898f; font-size:10px; }
+.dhl-admin-row-actions { display:flex; gap:2px; }.dhl-admin-row-actions a,.dhl-admin-row-actions button { display:grid; place-items:center; width:30px; height:30px; border:0; border-radius:7px; background:transparent; color:#62656a; }.dhl-admin-row-actions a:hover,.dhl-admin-row-actions button:hover { background:#fff0ef; color:#d40511; }
+.dhl-admin-pagination { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 19px; border-top:1px solid #edf0f1; color:#85898f; font-size:11px; }.dhl-admin-pagination > div { display:flex; align-items:center; gap:10px; color:#62656a; font-weight:750; }.dhl-admin-pagination button { display:grid; place-items:center; width:29px; height:29px; border:1px solid #e4e6e8; border-radius:7px; background:#fff; color:#62656a; }.dhl-admin-pagination button:disabled { opacity:.4; }
+.dhl-admin-mobile-shipments { display:none; }
+.dhl-admin-modal-layer { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:18px; background:rgba(13,16,19,.55); }
+.dhl-admin-confirm { width:min(430px,100%); padding:27px; border-radius:18px; background:#fff; box-shadow:0 20px 60px rgba(0,0,0,.2); }.dhl-admin-confirm-icon { display:grid; place-items:center; width:44px; height:44px; border-radius:12px; background:#fff0ef; color:#d40511; }.dhl-admin-confirm h2 { margin:16px 0 7px; font-size:20px; }.dhl-admin-confirm p { color:#62656a; font-size:13px; line-height:1.5; }.dhl-admin-confirm code { display:block; margin:16px 0; padding:10px; border-radius:8px; background:#f6f7f8; font-size:11px; overflow-wrap:anywhere; }.dhl-admin-confirm > div:last-child { display:flex; justify-content:flex-end; gap:8px; }
+@media (max-width:1399px) { .dhl-admin-kpis { grid-template-columns:repeat(3,minmax(0,1fr)); }.dhl-admin-overview-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }.dhl-admin-overview-grid > :first-child { grid-column:1 / -1; } }
+@media (max-width:1023px) { .dhl-admin-chart-grid { grid-template-columns:1fr; }.dhl-admin-chart-grid > :nth-child(2) { display:grid; grid-template-columns:1fr 1fr; align-items:center; }.dhl-admin-chart-grid > :nth-child(2) .dhl-admin-card-head { grid-column:1 / -1; }.dhl-admin-donut-area { height:190px; } }
+@media (max-width:767px) { .dhl-admin-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }.dhl-admin-kpi { min-height:138px; padding:14px; }.dhl-admin-kpi:last-child { grid-column:1 / -1; min-height:116px; }.dhl-admin-overview-grid { grid-template-columns:1fr; }.dhl-admin-overview-grid > :first-child { grid-column:auto; }.dhl-admin-chart-grid > :nth-child(2) { display:block; }.dhl-admin-period { width:100%; justify-content:space-around; }.dhl-admin-page-actions .dhl-admin-button { flex:1; }.dhl-admin-chart-area { height:220px; } }
+@media (max-width:767px) { .dhl-admin-shipment-table { display:none; }.dhl-admin-mobile-shipments { display:grid; gap:10px; padding:10px 13px 13px; }.dhl-admin-mobile-shipments article { padding:14px; border:1px solid #e4e6e8; border-radius:12px; background:#fff; }.dhl-admin-mobile-shipments article > div:first-child { display:flex; justify-content:space-between; align-items:center; gap:7px; margin-bottom:10px; }.dhl-admin-mobile-shipments article > div:first-child a { color:#d40511; font-family:ui-monospace,Consolas,monospace; font-size:11px; font-weight:800; }.dhl-admin-mobile-shipments article > strong { display:block; font-size:13px; }.dhl-admin-mobile-shipments article p { margin:5px 0; color:#62656a; font-size:11px; overflow-wrap:anywhere; }.dhl-admin-mobile-shipments article > small { color:#85898f; font-size:10px; }.dhl-admin-mobile-actions { display:flex; gap:13px; margin-top:13px; padding-top:10px; border-top:1px solid #edf0f1; }.dhl-admin-mobile-actions a,.dhl-admin-mobile-actions button { border:0; background:transparent; color:#d40511; font-size:11px; font-weight:800; }.dhl-admin-list-controls { padding:14px 12px 9px; }.dhl-admin-list-count { display:none; }.dhl-admin-tabs.shipment-tabs { padding-inline:10px; } }
+@media (max-width:1199px) { .dhl-admin-sidebar-desktop { flex-basis:72px; }.dhl-admin-sidebar-desktop .dhl-admin-sidebar { width:72px; }.dhl-admin-sidebar-desktop .dhl-admin-brand { padding:16px 9px; justify-content:center; }.dhl-admin-sidebar-desktop .dhl-admin-brand img { width:55px; object-position:left; }.dhl-admin-sidebar-desktop .dhl-admin-sidebar-intro,.dhl-admin-sidebar-desktop .dhl-admin-navigation span,.dhl-admin-sidebar-desktop .dhl-admin-sidebar-bottom { display:none; }.dhl-admin-sidebar-desktop .dhl-admin-navigation { padding-top:20px; }.dhl-admin-sidebar-desktop .dhl-admin-navigation a { justify-content:center; padding:0; }.dhl-admin-global-search { width:min(420px,40vw); } }
+@media (max-width:767px) { .dhl-admin-sidebar-desktop { display:none; }.dhl-admin-drawer-layer { position:fixed; inset:0; z-index:80; display:block; visibility:hidden; pointer-events:none; }.dhl-admin-drawer-layer.open { visibility:visible; pointer-events:auto; }.dhl-admin-drawer-layer .dhl-admin-sidebar { position:absolute; top:0; left:0; z-index:1; width:min(280px,86vw); transform:translateX(-100%); transition:transform 220ms ease; }.dhl-admin-drawer-layer.open .dhl-admin-sidebar { transform:translateX(0); }.dhl-admin-drawer-scrim { position:absolute; inset:0; width:100%; border:0; background:rgba(10,13,16,.6); opacity:0; transition:opacity 220ms ease; }.dhl-admin-drawer-layer.open .dhl-admin-drawer-scrim { opacity:1; }.dhl-admin-topbar { height:calc(62px + env(safe-area-inset-top)); padding:env(safe-area-inset-top) 15px 0; gap:8px; }.dhl-admin-menu-toggle { display:grid; }.dhl-admin-topbar-title { min-width:0; }.dhl-admin-global-search,.dhl-admin-live,.dhl-admin-top-actions > a:nth-of-type(2) { display:none; }.dhl-admin-top-actions { gap:2px; }.dhl-admin-top-actions > a { width:36px; height:36px; }.dhl-admin-main { min-height:calc(100dvh - 62px); padding:20px 15px 30px; }.dhl-admin-page-head { flex-direction:column; gap:14px; }.dhl-admin-page-actions { width:100%; }.dhl-admin-table { min-width:650px; } }
+@media (prefers-reduced-motion:reduce) { .dhl-admin-app *, .dhl-admin-app *::before, .dhl-admin-app *::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; } }

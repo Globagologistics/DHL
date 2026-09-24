@@ -1,97 +1,38 @@
-import React from "react";
-import { Link, useLocation } from "react-router-dom";
-import { LayoutDashboard, PlusCircle, MessageCircle, Mail } from "lucide-react";
+import { Link, NavLink, useLocation } from 'react-router-dom';
+import { BarChart3, Bell, ChevronDown, CircleHelp, LayoutDashboard, MapPin, MessageCircle, Package, Plus, Settings, Truck, Users, UserRound, X } from 'lucide-react';
+import { useState } from 'react';
 import { brandConfig } from '../../../config/brand';
+import { supabase } from '../../../lib/supabase';
 
-type AdminSidebarProps = {
-  onNavigate?: () => void;
-  className?: string;
-};
+type Props = { onNavigate?: () => void; onClose?: () => void; compact?: boolean };
 
-const navItems = [
-  {
-    label: "Dashboard",
-    to: "/admin",
-    icon: LayoutDashboard,
-  },
-  {
-    label: "New Shipment",
-    to: "/admin/new",
-    icon: PlusCircle,
-  },
-  {
-    label: "Admin Chat",
-    to: "/admin/chat",
-    icon: MessageCircle,
-  },
-  {
-    label: "Notifications",
-    to: "/admin/notifications",
-    icon: Mail,
-  },
+const navigation = [
+  { label: 'Dashboard', to: '/admin', icon: LayoutDashboard, exact: true },
+  { label: 'Shipments', to: '/admin/shipments', icon: Package },
+  { label: 'Create Shipment', to: '/admin/shipments/new', icon: Plus },
+  { label: 'Shipment Requests', to: '/admin/requests', icon: Truck },
+  { label: 'Customers', to: '/admin/customers', icon: Users },
+  { label: 'Support & Chat', to: '/admin/chat', icon: MessageCircle },
+  { label: 'Notifications', to: '/admin/notifications', icon: Bell },
+  { label: 'Reports & Analytics', to: '/admin/reports', icon: BarChart3 },
+  { label: 'Service Points', to: '/admin/service-points', icon: MapPin },
+  { label: 'Settings', to: '/admin/settings', icon: Settings },
 ];
 
-export default function AdminSidebar({ onNavigate, className }: AdminSidebarProps) {
+export default function AdminSidebar({ onNavigate, onClose, compact = false }: Props) {
   const location = useLocation();
-
-  const isActive = (to: string) => {
-    if (to === "/admin") {
-      return (
-        location.pathname === "/admin" ||
-        location.pathname.startsWith("/admin/view") ||
-        location.pathname.startsWith("/admin/edit")
-      );
-    }
-    return location.pathname.startsWith(to);
-  };
-
-  return (
-    <aside
-      className={`flex h-full w-64 flex-col border-r border-white/10 bg-gradient-to-b from-[#0B1220] via-[#0F1F3D] to-[#0B1220] text-white ${className ?? ""}`}
-    >
-      <div className="px-6 py-6">
-        <div className="flex items-center gap-3">
-          <img
-            src={brandConfig.favicon}
-            alt={`${brandConfig.appName} concept icon`}
-            className="h-10 w-10 rounded-full object-cover shadow-lg"
-          />
-          <div>
-            <div className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">
-              Admin
-            </div>
-            <div className="text-lg font-bold text-white">{brandConfig.shortName} Command</div>
-          </div>
-        </div>
-      </div>
-
-      <nav className="flex-1 px-4">
-        <div className="space-y-2">
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.to);
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                onClick={onNavigate}
-                className={`group flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-all ${
-                  active
-                    ? "bg-white/15 text-white shadow-[0_12px_30px_rgba(15,23,42,0.45)]"
-                    : "text-white/70 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                <Icon className={`h-5 w-5 ${active ? "text-white" : "text-white/60"}`} />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
-
-      <div className="px-6 py-6 text-xs text-white/50">
-        Secure admin access
-      </div>
-    </aside>
-  );
+  const [profileOpen, setProfileOpen] = useState(false);
+  const activeFor = (to: string, exact?: boolean) => exact ? location.pathname === to : location.pathname === to || location.pathname.startsWith(to + '/');
+  return <aside className={`dhl-admin-sidebar${compact ? ' compact' : ''}`} aria-label="Admin navigation">
+    <div className="dhl-admin-brand"><Link to="/admin" onClick={onNavigate} aria-label="DHL Admin Dashboard"><img src={brandConfig.cinematicLogo} alt="DHL Express" /></Link>{onClose && <button type="button" onClick={onClose} aria-label="Close admin navigation"><X size={20} /></button>}</div>
+    <div className="dhl-admin-sidebar-intro"><span>OPERATIONS CONSOLE</span><strong>Command center</strong></div>
+    <nav className="dhl-admin-navigation">
+      {navigation.map(({ label, to, icon: Icon, exact }) => <NavLink key={to} to={to} onClick={onNavigate} className={activeFor(to, exact) ? 'active' : ''} title={label}><Icon size={18} strokeWidth={1.9} aria-hidden="true" /><span>{label}</span></NavLink>)}
+    </nav>
+    <div className="dhl-admin-sidebar-bottom">
+      <Link className="dhl-admin-sidebar-help" to="/admin/settings" onClick={onNavigate}><CircleHelp size={18} /><span>Help & settings</span></Link>
+      <button type="button" className="dhl-admin-profile" onClick={() => setProfileOpen(value => !value)} aria-expanded={profileOpen}><span className="dhl-admin-avatar"><UserRound size={19} /></span><span className="dhl-admin-profile-copy"><strong>Admin</strong><small>Administrator access</small></span><ChevronDown size={16} /></button>
+      {profileOpen && <div className="dhl-admin-profile-menu"><Link to="/admin/settings" onClick={() => { setProfileOpen(false); onNavigate?.(); }}>Profile & settings</Link><button type="button" onClick={() => { void supabase.auth.signOut(); setProfileOpen(false); }}>Sign out</button></div>}
+    </div>
+  </aside>;
 }
