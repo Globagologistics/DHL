@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { ChatMessage, ChatRole, ChatThreadSummary, MediaAttachment } from "../types/chat";
-import { isDemoShipmentEnabled } from "../demo/demoShipment";
-import { getDemoMessages, getDemoThreadSummary, isDemoChatTarget, isDemoThreadId, markDemoThreadRead, sendDemoMessage, subscribeDemoChat } from "../demo/demoChatStore";
+import { devDataEnabled, subscribeDevData } from "../demo/devDataStore";
+import { deleteDemoMessage, getDemoMessages, getDemoThreadSummary, isDemoChatTarget, isDemoThreadId, listDemoThreads, markDemoThreadRead, sendDemoMessage, subscribeDemoChat } from "../demo/demoChatStore";
 
 type ChatThreadRow = {
   id: string;
@@ -31,6 +31,7 @@ type ChatMessageRow = {
   typing_speed_ms?: number | null;
   reply_to_message_id?: string | null;
   support_profile_id?: string | null;
+  deleted_at?: string | null;
 };
 
 const CHAT_MEDIA_BUCKET = "chat-media";
@@ -53,21 +54,27 @@ const toMessage = (row: ChatMessageRow): ChatMessage => ({
   sender: row.sender_role,
   senderName: row.sender_name || undefined,
   senderAvatarUrl: row.sender_avatar_url || undefined,
-  text: row.text || undefined,
-  media: Array.isArray(row.media) ? row.media : undefined,
+  text: row.deleted_at ? undefined : row.text || undefined,
+  media: !row.deleted_at && Array.isArray(row.media) ? row.media : undefined,
   createdAt: new Date(row.created_at).getTime(),
   animateTyping: row.animate_typing ?? false,
   typingSpeedMs: row.typing_speed_ms ?? undefined,
   replyToMessageId: row.reply_to_message_id ?? undefined,
   supportProfileId: row.support_profile_id ?? undefined,
+  deletedAt: row.deleted_at ? new Date(row.deleted_at).getTime() : undefined,
 });
 
-const withReplyTargets = (rows: ChatMessageRow[]): ChatMessage[] => {
-  const messages = rows.map(toMessage);
+/**
+ * Resolves quoted replies. Customers never see deleted support messages or
+ * quotes of them; admins get a content-free "deleted" marker instead.
+ */
+const withReplyTargets = (messages: ChatMessage[], viewer: ChatRole): ChatMessage[] => {
   const byId = new Map(messages.map(message => [message.id, message]));
-  return messages.map(message => {
+  const visible = viewer === 'user' ? messages.filter(message => !message.deletedAt) : messages;
+  return visible.map(message => {
     const target = message.replyToMessageId ? byId.get(message.replyToMessageId) : undefined;
     if (!target) return message;
+    if (target.deletedAt) return viewer === 'user' ? { ...message, replyToMessageId: undefined, replyTo: undefined } : { ...message, replyTo: { id: target.id, sender: target.sender, senderName: target.senderName, deleted: true } };
     return { ...message, replyTo: { id: target.id, sender: target.sender, senderName: target.senderName, text: target.text, media: target.media, supportProfileId: target.supportProfileId } };
   });
 };
@@ -120,8 +127,8 @@ const uploadChatMedia = async (
 export async function ensureChatThread(trackingId: string): Promise<ChatThreadSummary | null> {
   const trimmed = trackingId.trim();
   if (!trimmed) return null;
-  // Development demo shipment uses the shared local conversation.
-  if (isDemoChatTarget(trimmed)) return getDemoThreadSummary();
+  // Development-store shipments use the shared local conversation.
+  if (isDemoChatTarget(trimmed)) return getDemoThreadSummary(trimmed);
 
   const { data, error } = await supabase
     .rpc("ensure_chat_thread", { p_tracking_id: trimmed })
@@ -160,7 +167,7 @@ export async function sendChatMessage(payload: {
   const trimmed = payload.trackingId.trim();
   if (!trimmed) return { data: null, error: "Missing tracking ID" };
   if (isDemoThreadId(payload.threadId) || isDemoChatTarget(trimmed)) {
-    const message = sendDemoMessage(payload);
+    const message = sendDemoMessage(payload.threadId || trimmed, payload);
     return message ? { data: message, error: null } : { data: null, error: "Message is empty" };
   }
 
@@ -215,11 +222,29 @@ export async function sendChatMessage(payload: {
   return { data: toMessage(data as ChatMessageRow), error: null };
 }
 
+/**
+ * Admin-only. Removes a SUPPORT message from the customer's conversation.
+ * Authorization is enforced server-side by delete_support_message (migration
+ * 20260926000001): only admins, only support-sent messages. Emails or
+ * notifications already sent about the message cannot be recalled.
+ */
+export async function deleteSupportMessage(threadId: string, messageId: string): Promise<string | null> {
+  if (isDemoThreadId(threadId)) {
+    try { deleteDemoMessage(threadId, messageId); return null; } catch (error) { return error instanceof Error ? error.message : 'Message could not be deleted.'; }
+  }
+  const { error } = await supabase.rpc('delete_support_message', { p_message_id: messageId });
+  if (error) {
+    console.error('Failed to delete support message:', error);
+    return /function .* does not exist|could not find the function/i.test(error.message || '') ? 'Message deletion needs the chat-deletion migration (Part Two).' : 'Message could not be deleted. Please try again.';
+  }
+  return null;
+}
+
 export async function markThreadRead(threadId: string, role: ChatRole) {
   const trimmed = threadId.trim();
   if (!trimmed) return;
   if (isDemoThreadId(trimmed)) {
-    markDemoThreadRead(role);
+    markDemoThreadRead(trimmed, role);
     return;
   }
 
@@ -239,17 +264,20 @@ export async function markThreadRead(threadId: string, role: ChatRole) {
 export function useChatThreads() {
   const [realThreads, setThreads] = useState<ChatThreadSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [demoThread, setDemoThread] = useState<ChatThreadSummary | null>(() => isDemoShipmentEnabled() ? getDemoThreadSummary() : null);
+  const [devThreads, setDevThreads] = useState<ChatThreadSummary[]>(() => listDemoThreads());
 
-  // Development demo conversation appears alongside real threads.
+  // Development conversations appear alongside real threads.
   useEffect(() => {
-    if (!isDemoShipmentEnabled()) return;
-    return subscribeDemoChat(() => setDemoThread(getDemoThreadSummary()));
+    if (!devDataEnabled()) return;
+    const refresh = () => setDevThreads(listDemoThreads());
+    const offChat = subscribeDemoChat(refresh);
+    const offData = subscribeDevData(refresh);
+    return () => { offChat(); offData(); };
   }, []);
 
   const threads = useMemo(
-    () => demoThread ? [demoThread, ...realThreads].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)) : realThreads,
-    [demoThread, realThreads]
+    () => [...devThreads, ...realThreads].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)),
+    [devThreads, realThreads]
   );
 
   const fetchThreads = useCallback(async () => {
@@ -294,19 +322,26 @@ export function useChatThreads() {
   return { threads, loading, refresh: fetchThreads };
 }
 
-export function useChatMessages(trackingId: string, threadId?: string) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+/**
+ * Conversation messages for one viewer. `viewer` decides deletion handling:
+ * 'user' drops deleted support messages entirely; 'admin' keeps an audit marker.
+ */
+export function useChatMessages(trackingId: string, threadId?: string, viewer: ChatRole = 'user') {
+  const [rawMessages, setMessages] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
+  const [devMessages, setDevMessages] = useState<ChatMessage[] | null>(null);
 
   useEffect(() => {
     let active = true;
 
     if (isDemoThreadId(threadId) || isDemoChatTarget(trackingId.trim())) {
-      setMessages(getDemoMessages());
+      const target = threadId || trackingId.trim();
+      setDevMessages(getDemoMessages(target, viewer));
       setLoading(false);
-      const unsubscribe = subscribeDemoChat(() => { if (active) setMessages(getDemoMessages()); });
+      const unsubscribe = subscribeDemoChat(() => { if (active) setDevMessages(getDemoMessages(target, viewer)); });
       return () => { active = false; unsubscribe(); };
     }
+    setDevMessages(null);
 
     const fetchMessages = async () => {
       const trimmed = trackingId.trim();
@@ -340,8 +375,7 @@ export function useChatMessages(trackingId: string, threadId?: string) {
         return;
       }
 
-      const mapped = withReplyTargets(data as ChatMessageRow[]);
-      setMessages(mapped);
+      setMessages((data as ChatMessageRow[]).map(toMessage));
       setLoading(false);
     };
 
@@ -353,7 +387,7 @@ export function useChatMessages(trackingId: string, threadId?: string) {
     const activeThreadId = threadId;
     if (!activeThreadId) return () => {};
     const channel = supabase
-      .channel(`chat-messages-${activeThreadId}`)
+      .channel(`chat-messages-${activeThreadId}-${viewer}`)
       .on(
         "postgres_changes",
         {
@@ -368,20 +402,13 @@ export function useChatMessages(trackingId: string, threadId?: string) {
 
           if (payload.eventType === "INSERT" && newRow) {
             const next = toMessage(newRow);
-            setMessages((prev) => {
-              if (prev.some((msg) => msg.id === next.id)) return prev;
-              const withNew = [...prev, next];
-              return withNew.map(message => message.replyToMessageId
-                ? { ...message, replyTo: (() => { const target = withNew.find(item => item.id === message.replyToMessageId); return target ? { id: target.id, sender: target.sender, senderName: target.senderName, text: target.text, media: target.media, supportProfileId: target.supportProfileId } : undefined; })() }
-                : message);
-            });
+            setMessages((prev) => prev.some((msg) => msg.id === next.id) ? prev : [...prev, next]);
           }
 
+          // A deletion arrives as an UPDATE with deleted_at set.
           if (payload.eventType === "UPDATE" && newRow) {
             const next = toMessage(newRow);
-            setMessages((prev) =>
-              prev.map((msg) => (msg.id === next.id ? next : msg))
-            );
+            setMessages((prev) => prev.map((msg) => (msg.id === next.id ? next : msg)));
           }
 
           if (payload.eventType === "DELETE" && oldRow) {
@@ -395,12 +422,12 @@ export function useChatMessages(trackingId: string, threadId?: string) {
       active = false;
       channel.unsubscribe();
     };
-  }, [trackingId, threadId]);
+  }, [trackingId, threadId, viewer]);
 
-  const sortedMessages = useMemo(
-    () => [...messages].sort((a, b) => a.createdAt - b.createdAt),
-    [messages]
-  );
+  const messages = useMemo(() => {
+    if (devMessages) return devMessages;
+    return withReplyTargets([...rawMessages].sort((a, b) => a.createdAt - b.createdAt), viewer);
+  }, [devMessages, rawMessages, viewer]);
 
-  return { messages: sortedMessages, loading };
+  return { messages, loading };
 }

@@ -9,8 +9,13 @@ export const replyLabel = (message: Pick<ChatMessage, 'sender' | 'senderName' | 
 
 const excerpt = (message: Pick<ChatMessage, 'text' | 'media'>) => message.text?.replace(/\s+/g, ' ').trim() || message.media?.[0]?.name || 'Attachment';
 
+/**
+ * Quoted context inside a reply. A quote of a deleted support message shows a
+ * content-free note (admins only; customers never receive such quotes).
+ */
 export function QuotedReply({ message }: { message?: ChatMessage['replyTo'] }) {
-  if (!message) return <div className="dhl-reply-quote unavailable">Original message unavailable</div>;
+  if (!message) return null;
+  if (message.deleted) return <div className="dhl-reply-quote unavailable">Original support message deleted</div>;
   return <div className="dhl-reply-quote"><strong>{replyLabel(message)}</strong><span>{message.media?.length && !message.text ? <><FileImage size={13} /> {excerpt(message)}</> : excerpt(message)}</span></div>;
 }
 

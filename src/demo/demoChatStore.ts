@@ -1,25 +1,34 @@
 import { activeSupportAgent } from '../config/supportAgents';
 import type { ChatMessage, ChatRole, ChatThreadSummary } from '../types/chat';
-import { DEMO_SHIPMENT_RECORD_ID, DEMO_TRACKING_ID, isDemoShipmentEnabled, isDemoShipmentReference } from './demoShipment';
+import { DEMO_SHIPMENT_RECORD_ID, DEMO_TRACKING_ID } from './demoShipment';
+import { devDataEnabled, findDevShipment, isDevShipmentId } from './devDataStore';
 
 /**
- * Development chat adapter for the demo shipment only. Customer Support and
- * Admin Chat read and write this ONE conversation, so both sides of the
- * exchange can be inspected before the production backend exists. State lives
- * in localStorage and syncs across tabs through `storage` events. Production
- * chat is untouched: every entry point checks isDemoShipmentEnabled().
+ * Development chat adapter for development-store shipments. Customer Support
+ * and Admin Chat read and write the SAME conversation per shipment (one
+ * browser, synced across tabs). Production chat is untouched: every entry
+ * point checks that the shipment belongs to the development store.
+ *
+ * Deletion mirrors the production RPC: the message keeps its row with
+ * deletedAt set and its text/media removed, so customers never see it and
+ * admins see an audit marker.
  */
 
-export const DEMO_THREAD_ID = 'demo-thread-010101010101';
-const STORAGE_KEY = 'dhl-dev-demo-chat-v1';
+const STORAGE_KEY = 'dhl-dev-chat-v2';
+const THREAD_PREFIX = 'dev-thread-';
 
 type StoredMessage = Omit<ChatMessage, 'replyTo'>;
-type DemoChatState = { messages: StoredMessage[]; unreadForAdmin: number; unreadForUser: number };
+type ThreadState = { messages: StoredMessage[]; unreadForAdmin: number; unreadForUser: number };
+type ChatState = Record<string, ThreadState>;
 
-export const isDemoThreadId = (threadId?: string | null) => isDemoShipmentEnabled() && threadId === DEMO_THREAD_ID;
-export const isDemoChatTarget = (trackingIdOrThreadId?: string | null) => isDemoThreadId(trackingIdOrThreadId) || isDemoShipmentReference(trackingIdOrThreadId);
+export const threadIdFor = (shipmentId: string) => `${THREAD_PREFIX}${shipmentId}`;
+const shipmentIdOf = (threadId: string) => threadId.slice(THREAD_PREFIX.length);
 
-function seed(): DemoChatState {
+export const isDemoThreadId = (threadId?: string | null) => Boolean(threadId && devDataEnabled() && threadId.startsWith(THREAD_PREFIX) && isDevShipmentId(shipmentIdOf(threadId)));
+/** A development thread id, or the record id / tracking number of a development shipment. */
+export const isDemoChatTarget = (value?: string | null) => isDemoThreadId(value) || Boolean(value && findDevShipment(value));
+
+function seedDemoThread(): ThreadState {
   const agent = activeSupportAgent();
   const now = Date.now();
   const support = (id: string, text: string, createdAt: number): StoredMessage => ({ id, trackingId: DEMO_SHIPMENT_RECORD_ID, sender: 'admin', text, createdAt, senderName: agent.name, senderAvatarUrl: agent.avatar, supportProfileId: agent.id });
@@ -34,26 +43,24 @@ function seed(): DemoChatState {
   };
 }
 
-function read(): DemoChatState {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw) as DemoChatState;
-  } catch { /* fall through to a fresh seed */ }
-  const fresh = seed();
-  write(fresh, false);
-  return fresh;
+const listeners = new Set<() => void>();
+let memory: ChatState | null = null;
+
+function read(): ChatState {
+  if (memory) return memory;
+  try { memory = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null') as ChatState | null; } catch { memory = null; }
+  if (!memory) { memory = { [DEMO_SHIPMENT_RECORD_ID]: seedDemoThread() }; write(memory, false); }
+  return memory;
 }
 
-const listeners = new Set<() => void>();
-
-function write(state: DemoChatState, notify = true) {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* storage unavailable: this tab only */ }
+function write(state: ChatState, notify = true) {
+  memory = state;
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch { /* this tab only */ }
   if (notify) listeners.forEach(listener => listener());
 }
 
 if (typeof window !== 'undefined') {
-  // Another tab (for example Admin Chat) changed the conversation.
-  window.addEventListener('storage', event => { if (event.key === STORAGE_KEY) listeners.forEach(listener => listener()); });
+  window.addEventListener('storage', event => { if (event.key === STORAGE_KEY) { memory = null; listeners.forEach(listener => listener()); } });
 }
 
 export function subscribeDemoChat(listener: () => void) {
@@ -61,22 +68,32 @@ export function subscribeDemoChat(listener: () => void) {
   return () => { listeners.delete(listener); };
 }
 
-/** Messages with reply targets resolved, oldest first. */
-export function getDemoMessages(): ChatMessage[] {
-  const messages = read().messages;
+const threadState = (shipmentId: string): ThreadState => read()[shipmentId] || { messages: [], unreadForAdmin: 0, unreadForUser: 0 };
+const resolveShipmentId = (target: string) => target.startsWith(THREAD_PREFIX) ? shipmentIdOf(target) : findDevShipment(target)?.id || target;
+
+/**
+ * Messages oldest first. Customers never receive deleted messages or quotes
+ * of them; admins receive deleted messages as content-free audit markers.
+ */
+export function getDemoMessages(target: string, viewer: ChatRole = 'admin'): ChatMessage[] {
+  const messages = threadState(resolveShipmentId(target)).messages;
+  const visible = viewer === 'user' ? messages.filter(message => !message.deletedAt) : messages;
   const byId = new Map(messages.map(message => [message.id, message]));
-  return messages.map(message => {
+  return visible.map(message => {
     const target = message.replyToMessageId ? byId.get(message.replyToMessageId) : undefined;
-    return target ? { ...message, replyTo: { id: target.id, sender: target.sender, senderName: target.senderName, text: target.text, media: target.media, supportProfileId: target.supportProfileId } } : message;
+    if (!target) return message;
+    if (target.deletedAt) return viewer === 'user' ? { ...message, replyToMessageId: undefined } : { ...message, replyTo: { id: target.id, sender: target.sender, senderName: target.senderName, deleted: true } };
+    return { ...message, replyTo: { id: target.id, sender: target.sender, senderName: target.senderName, text: target.text, media: target.media, supportProfileId: target.supportProfileId } };
   });
 }
 
-export function getDemoThreadSummary(): ChatThreadSummary {
-  const state = read();
-  const last = state.messages[state.messages.length - 1];
+export function getDemoThreadSummary(target: string): ChatThreadSummary {
+  const shipmentId = resolveShipmentId(target);
+  const state = threadState(shipmentId);
+  const last = [...state.messages].reverse().find(message => !message.deletedAt);
   return {
-    id: DEMO_THREAD_ID,
-    trackingId: DEMO_SHIPMENT_RECORD_ID,
+    id: threadIdFor(shipmentId),
+    trackingId: shipmentId,
     participantRole: 'receiver',
     lastMessageAt: last?.createdAt,
     lastMessagePreview: last?.text ?? null,
@@ -85,13 +102,21 @@ export function getDemoThreadSummary(): ChatThreadSummary {
   };
 }
 
-export function sendDemoMessage(payload: { sender: ChatRole; text?: string; senderName?: string; senderAvatarUrl?: string; replyToMessageId?: string; supportProfileId?: string }): ChatMessage | null {
+/** Every development conversation that has at least one message. */
+export function listDemoThreads(): ChatThreadSummary[] {
+  if (!devDataEnabled()) return [];
+  return Object.keys(read()).filter(id => isDevShipmentId(id) && threadState(id).messages.length).map(id => getDemoThreadSummary(id));
+}
+
+export function sendDemoMessage(target: string, payload: { sender: ChatRole; text?: string; senderName?: string; senderAvatarUrl?: string; replyToMessageId?: string; supportProfileId?: string }): ChatMessage | null {
   const text = payload.text?.trimEnd();
   if (!text) return null;
+  const shipmentId = resolveShipmentId(target);
   const state = read();
+  const thread = threadState(shipmentId);
   const message: StoredMessage = {
-    id: `demo-msg-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
-    trackingId: DEMO_SHIPMENT_RECORD_ID,
+    id: `dev-msg-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+    trackingId: shipmentId,
     sender: payload.sender,
     text,
     createdAt: Date.now(),
@@ -101,20 +126,36 @@ export function sendDemoMessage(payload: { sender: ChatRole; text?: string; send
     supportProfileId: payload.supportProfileId,
   };
   write({
-    messages: [...state.messages, message],
-    unreadForAdmin: payload.sender === 'user' ? state.unreadForAdmin + 1 : state.unreadForAdmin,
-    unreadForUser: payload.sender === 'admin' ? state.unreadForUser + 1 : state.unreadForUser,
+    ...state,
+    [shipmentId]: {
+      messages: [...thread.messages, message],
+      unreadForAdmin: payload.sender === 'user' ? thread.unreadForAdmin + 1 : thread.unreadForAdmin,
+      unreadForUser: payload.sender === 'admin' ? thread.unreadForUser + 1 : thread.unreadForUser,
+    },
   });
   return message;
 }
 
-export function markDemoThreadRead(role: ChatRole) {
+/** Admin-only: removes a SUPPORT message from the customer's conversation. */
+export function deleteDemoMessage(threadId: string, messageId: string) {
+  const shipmentId = resolveShipmentId(threadId);
   const state = read();
-  if ((role === 'admin' ? state.unreadForAdmin : state.unreadForUser) === 0) return;
-  write(role === 'admin' ? { ...state, unreadForAdmin: 0 } : { ...state, unreadForUser: 0 });
+  const thread = threadState(shipmentId);
+  const target = thread.messages.find(message => message.id === messageId);
+  if (!target) throw new Error('Message not found.');
+  if (target.sender !== 'admin') throw new Error('Only support messages can be deleted.');
+  write({ ...state, [shipmentId]: { ...thread, messages: thread.messages.map(message => message.id === messageId ? { ...message, text: undefined, media: undefined, deletedAt: Date.now() } : message) } });
 }
 
-/** Restores the three seed messages (Settings developer helper). */
+export function markDemoThreadRead(threadId: string, role: ChatRole) {
+  const shipmentId = resolveShipmentId(threadId);
+  const state = read();
+  const thread = threadState(shipmentId);
+  if ((role === 'admin' ? thread.unreadForAdmin : thread.unreadForUser) === 0) return;
+  write({ ...state, [shipmentId]: role === 'admin' ? { ...thread, unreadForAdmin: 0 } : { ...thread, unreadForUser: 0 } });
+}
+
+/** Restores the seed conversation and clears other development chats. */
 export function resetDemoChat() {
-  write(seed());
+  write({ [DEMO_SHIPMENT_RECORD_ID]: seedDemoThread() });
 }

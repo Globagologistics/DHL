@@ -8,6 +8,7 @@ import { useTrackingLookup } from '../../features/tracking/useTrackingLookup';
 import { WhatsAppIcon, WhatsAppSupportButton } from '../../features/whatsapp/WhatsAppSupport';
 import { displayTrackingReference, formatTrackingNumber, isShipmentRecordId, trackingReferenceFor } from '../../services/trackingService';
 import { useShipmentWithCheckpoints } from '../../hooks/useSupabase';
+import { useVisualViewportHeight } from '../../hooks/useVisualViewport';
 import { formatJourneyStatus, getShipmentJourneyState } from '../utils/shipmentJourney';
 import { brandConfig } from '../../config/brand';
 import { activeSupportAgent } from '../../config/supportAgents';
@@ -41,6 +42,7 @@ function ShipmentMessageCard({context,onDetails}:{context:ShipmentContext;onDeta
  * attachments are off and a small note explains it is shared with Admin Chat.
  */
 function ChatView({context,messages,loading,developmentDemo,onBack,onSend}:{context:ShipmentContext;messages:ChatMessage[];loading:boolean;developmentDemo:boolean;onBack:()=>void;onSend:(text:string,file:File|null,replyTo:ChatMessage|null)=>Promise<string|null>}) {
+  useVisualViewportHeight(true);
   const [detailsOpen,setDetailsOpen]=useState(false); const [replyTo,setReplyTo]=useState<ChatMessage|null>(null); const [following,setFollowing]=useState(true); const [newCount,setNewCount]=useState(0); const bottom=useRef<HTMLDivElement>(null); const scroller=useRef<HTMLDivElement>(null); const agent=activeSupportAgent();
   useEffect(()=>{if(following)bottom.current?.scrollIntoView({block:'end'});else if(messages.length)setNewCount(count=>count+1);},[messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{if(!detailsOpen)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setDetailsOpen(false);};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close);},[detailsOpen]);
@@ -64,7 +66,8 @@ function ChatView({context,messages,loading,developmentDemo,onBack,onSend}:{cont
 }
 
 function Conversation({thread,onBack}:{thread:ActiveThread;onBack:()=>void}) {
-  const {messages,loading}=useChatMessages(thread.trackingId,thread.id);
+  // Customer view: deleted support messages (and quotes of them) never arrive.
+  const {messages,loading}=useChatMessages(thread.trackingId,thread.id,'user');
   const {shipment}=useShipmentWithCheckpoints(thread.trackingId);
   useEffect(()=>{void markThreadRead(thread.id,'user');},[thread.id,messages.length]);
   return <ChatView context={shipmentContext(thread.reference,shipment)} messages={messages} loading={loading} developmentDemo={isDemoThreadId(thread.id)} onBack={onBack} onSend={async(text,file,replyTo)=>{const result=await sendChatMessage({trackingId:thread.trackingId,threadId:thread.id,sender:'user',text,mediaFiles:file?[file]:[],replyToMessageId:replyTo?.id});return result.error||null;}}/>;

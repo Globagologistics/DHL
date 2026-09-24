@@ -16,7 +16,9 @@ export default function AdminLayout() {
     window.addEventListener('keydown', close);
     return () => window.removeEventListener('keydown', close);
   }, [drawerOpen]);
-  return <div className="dhl-admin-app">
+  // The dedicated conversation screen fills the viewport; only its message list scrolls.
+  const chatFocus = /^\/admin\/chat\/[^/]+/.test(location.pathname);
+  return <div className={`dhl-admin-app${chatFocus ? ' chat-focus' : ''}`}>
     <div className="dhl-admin-sidebar-desktop"><AdminSidebar /></div>
     <div className={`dhl-admin-drawer-layer${drawerOpen ? ' open' : ''}`} aria-hidden={!drawerOpen}><button className="dhl-admin-drawer-scrim" type="button" onClick={() => setDrawerOpen(false)} tabIndex={drawerOpen ? 0 : -1} aria-label="Close admin navigation" /><AdminSidebar onNavigate={() => setDrawerOpen(false)} onClose={() => setDrawerOpen(false)} /></div>
     <div className="dhl-admin-workspace">
