@@ -7,7 +7,8 @@ export const environment = {
   serverFunctionsBase: import.meta.env.VITE_SERVER_FUNCTIONS_BASE || '/.netlify/functions',
   /** Bootstrap WhatsApp number used only until Admin > Settings stores one. Not a secret. */
   whatsappFallbackNumber: import.meta.env.VITE_WHATSAPP_NUMBER || '',
-  demoSupportAccess: import.meta.env.DEV && import.meta.env.VITE_DEMO_SUPPORT_ACCESS === 'true',
+  /** Development-only demo shipment 010101010101 (src/demo). Never active in production builds. */
+  demoShipment: import.meta.env.DEV && import.meta.env.VITE_ENABLE_DEMO_SHIPMENT === 'true',
   enableAdminShortcut: import.meta.env.DEV && import.meta.env.VITE_ENABLE_ADMIN_SHORTCUT === 'true',
   devAdminBypass: import.meta.env.DEV && import.meta.env.VITE_DEV_ADMIN_BYPASS === 'true',
   /** Development-only settings store in this browser. Never used for credentials. */

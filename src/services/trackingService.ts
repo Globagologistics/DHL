@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase';
+import { DEMO_SHIPMENT_RECORD_ID, DEMO_TRACKING_ID, isDemoShipmentReference } from '../demo/demoShipment';
 
 /** Customer tracking numbers are exactly 12 numeric digits. */
 export const TRACKING_NUMBER_LENGTH = 12;
@@ -37,20 +38,41 @@ export type TrackingLookupResult =
   | { status: 'error' };
 
 type ShipmentReferenceRow = { id: string; tracking_number?: string | null };
+type QueryError = { code?: string; message?: string } | null;
+
+const LOOKUP_TIMEOUT_MS = 15_000;
 
 /**
- * Resolves a customer reference to a shipment. A failed request is reported
- * as 'error', never as 'not_found', so a network or configuration problem is
- * not presented as a wrong tracking number.
+ * Before migration 20260925000000 the tracking_number column does not exist.
+ * No shipment can then carry a 12-digit number, so the honest answer for a
+ * well-formed number is "not found", not a connection problem.
+ */
+export function isMissingTrackingColumn(error: QueryError) {
+  return Boolean(error && (error.code === '42703' || (/tracking_number/i.test(error.message || '') && /does not exist|could not find/i.test(error.message || ''))));
+}
+
+export function withLookupTimeout<T>(request: PromiseLike<T>): Promise<T> {
+  let timer: number | undefined;
+  const timeout = new Promise<never>((_, reject) => { timer = window.setTimeout(() => reject(new Error('Shipment lookup timed out')), LOOKUP_TIMEOUT_MS); });
+  return Promise.race([Promise.resolve(request), timeout]).finally(() => window.clearTimeout(timer));
+}
+
+/**
+ * Resolves a customer reference to a shipment. Only a completed request with
+ * no matching row is 'not_found'; network failures, timeouts and server
+ * errors are 'error', so a technical problem is never shown as a wrong number.
  */
 export async function lookupShipmentReference(reference: string): Promise<TrackingLookupResult> {
+  // Development demo shipment (only when VITE_ENABLE_DEMO_SHIPMENT is on).
+  if (isDemoShipmentReference(reference)) return { status: 'found', shipmentId: DEMO_SHIPMENT_RECORD_ID, trackingNumber: DEMO_TRACKING_ID };
   const target = resolveShipmentReference(reference);
   if (!target) return { status: 'not_found' };
   try {
     // select('*') works before and after the tracking_number migration.
-    const { data, error } = await supabase.from('shipments').select('*').eq(target.column, target.value).limit(1);
+    const { data, error } = await withLookupTimeout<{ data: unknown; error: QueryError }>(supabase.from('shipments').select('*').eq(target.column, target.value).limit(1));
     if (error) {
-      if (import.meta.env.DEV) console.warn('Shipment lookup failed. If tracking_number is missing, apply migration 20260925000000.', error);
+      if (target.column === 'tracking_number' && isMissingTrackingColumn(error)) return { status: 'not_found' };
+      if (import.meta.env.DEV) console.warn('Shipment lookup failed:', error);
       return { status: 'error' };
     }
     const row = (data as ShipmentReferenceRow[] | null)?.[0];

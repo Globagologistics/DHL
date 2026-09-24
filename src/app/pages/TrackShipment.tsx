@@ -15,8 +15,9 @@ type Detail = 'package' | 'waybill' | 'map' | null;
 
 const prettyDate = (value?: string | null) => value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) : 'Not available';
 const prettyTime = (value?: string | null) => value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '—';
-const imageUrl = (value: string) => value.startsWith('http') || value.startsWith('data:') ? value : supabase.storage.from('shipment-images').getPublicUrl(value).data.publicUrl;
-const routeImageUrl = (value: string) => value.startsWith('http') || value.startsWith('data:') ? value : supabase.storage.from('route-screenshots').getPublicUrl(value).data.publicUrl;
+const isResolved = (value: string) => value.startsWith('http') || value.startsWith('data:') || value.startsWith('/');
+const imageUrl = (value: string) => isResolved(value) ? value : supabase.storage.from('shipment-images').getPublicUrl(value).data.publicUrl;
+const routeImageUrl = (value: string) => isResolved(value) ? value : supabase.storage.from('route-screenshots').getPublicUrl(value).data.publicUrl;
 
 function RouteGraphic({ shipment }: { shipment: ShipmentWithCheckpoints }) {
   if (shipment.route_screenshot_url) return <img className="dhl-package-preview" src={routeImageUrl(shipment.route_screenshot_url)} alt="Recorded shipment route"/>;

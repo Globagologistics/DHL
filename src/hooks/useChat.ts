@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../lib/supabase";
 import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import type { ChatMessage, ChatRole, ChatThreadSummary, MediaAttachment } from "../types/chat";
+import { isDemoShipmentEnabled } from "../demo/demoShipment";
+import { getDemoMessages, getDemoThreadSummary, isDemoChatTarget, isDemoThreadId, markDemoThreadRead, sendDemoMessage, subscribeDemoChat } from "../demo/demoChatStore";
 
 type ChatThreadRow = {
   id: string;
@@ -118,6 +120,8 @@ const uploadChatMedia = async (
 export async function ensureChatThread(trackingId: string): Promise<ChatThreadSummary | null> {
   const trimmed = trackingId.trim();
   if (!trimmed) return null;
+  // Development demo shipment uses the shared local conversation.
+  if (isDemoChatTarget(trimmed)) return getDemoThreadSummary();
 
   const { data, error } = await supabase
     .rpc("ensure_chat_thread", { p_tracking_id: trimmed })
@@ -155,6 +159,10 @@ export async function sendChatMessage(payload: {
 }) {
   const trimmed = payload.trackingId.trim();
   if (!trimmed) return { data: null, error: "Missing tracking ID" };
+  if (isDemoThreadId(payload.threadId) || isDemoChatTarget(trimmed)) {
+    const message = sendDemoMessage(payload);
+    return message ? { data: message, error: null } : { data: null, error: "Message is empty" };
+  }
 
   const thread = payload.threadId
     ? { id: payload.threadId, tracking_id: trimmed }
@@ -210,6 +218,10 @@ export async function sendChatMessage(payload: {
 export async function markThreadRead(threadId: string, role: ChatRole) {
   const trimmed = threadId.trim();
   if (!trimmed) return;
+  if (isDemoThreadId(trimmed)) {
+    markDemoThreadRead(role);
+    return;
+  }
 
   const updates =
     role === "admin" ? { unread_for_admin: 0 } : { unread_for_user: 0 };
@@ -225,8 +237,20 @@ export async function markThreadRead(threadId: string, role: ChatRole) {
 }
 
 export function useChatThreads() {
-  const [threads, setThreads] = useState<ChatThreadSummary[]>([]);
+  const [realThreads, setThreads] = useState<ChatThreadSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [demoThread, setDemoThread] = useState<ChatThreadSummary | null>(() => isDemoShipmentEnabled() ? getDemoThreadSummary() : null);
+
+  // Development demo conversation appears alongside real threads.
+  useEffect(() => {
+    if (!isDemoShipmentEnabled()) return;
+    return subscribeDemoChat(() => setDemoThread(getDemoThreadSummary()));
+  }, []);
+
+  const threads = useMemo(
+    () => demoThread ? [demoThread, ...realThreads].sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0)) : realThreads,
+    [demoThread, realThreads]
+  );
 
   const fetchThreads = useCallback(async () => {
     setLoading(true);
@@ -276,6 +300,13 @@ export function useChatMessages(trackingId: string, threadId?: string) {
 
   useEffect(() => {
     let active = true;
+
+    if (isDemoThreadId(threadId) || isDemoChatTarget(trackingId.trim())) {
+      setMessages(getDemoMessages());
+      setLoading(false);
+      const unsubscribe = subscribeDemoChat(() => { if (active) setMessages(getDemoMessages()); });
+      return () => { active = false; unsubscribe(); };
+    }
 
     const fetchMessages = async () => {
       const trimmed = trackingId.trim();

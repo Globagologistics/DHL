@@ -6,6 +6,7 @@ import { AdminContext } from '../contexts/AdminContext';
 import { supabase } from '../../lib/supabase';
 import { useChatThreads } from '../../hooks/useChat';
 import { formatTrackingNumber } from '../../services/trackingService';
+import { demoShipmentLabel } from '../../demo/demoShipment';
 
 type Period = 1 | 7 | 30;
 type ActivityShipment = { id:string; sender_name:string; receiver_name:string; delivery_address:string; status:string; created_at:string; delivered_at:string|null; cancelled_at:string|null };
@@ -82,7 +83,7 @@ export default function Admin() {
   const pendingRequests = requests.filter(request => request.status === 'pending').length;
   const unreadChats = threads.reduce((sum,thread) => sum + thread.unreadForAdmin,0);
   const shipmentById = useMemo(() => new Map(shipments.map(item => [item.id,item])),[shipments]);
-  const reference = (id:string) => { const number = shipmentById.get(id)?.trackingNumber; return number ? formatTrackingNumber(number) : id.slice(0,8).toUpperCase(); };
+  const reference = (id:string) => { const demo = demoShipmentLabel(id); if (demo) return demo; const number = shipmentById.get(id)?.trackingNumber; return number ? formatTrackingNumber(number) : id.slice(0,8).toUpperCase(); };
   const kpis = [
     {label:'Total Shipments',value:rows.length,icon:Package,tone:'yellow',detail:'Across your shipment portfolio',to:'/admin/shipments'},
     {label:'Pending Requests',value:requestsAvailable?pendingRequests:'—',icon:Clock3,tone:'red',detail:requestsAvailable?'Awaiting admin review':'Request backend not installed',to:'/admin/requests'},

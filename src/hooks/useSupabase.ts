@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Shipment, Checkpoint, ShipmentWithCheckpoints } from '../types/database';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { resolveShipmentReference } from '../services/trackingService';
+import { isMissingTrackingColumn, resolveShipmentReference, withLookupTimeout } from '../services/trackingService';
+import { buildDemoShipment, isDemoShipmentReference } from '../demo/demoShipment';
 
 // Hook to fetch all shipments for admin
 export function useAdminShipments(adminId: string) {
@@ -80,6 +81,12 @@ export function useShipmentWithCheckpoints(reference: string) {
       setLoading(false);
       return;
     }
+    // Development demo shipment: same data contract, no backend call.
+    if (isDemoShipmentReference(reference)) {
+      setShipment(buildDemoShipment());
+      setLoading(false);
+      return;
+    }
     const target = resolveShipmentReference(reference);
     if (!target) {
       setNotFound(true);
@@ -93,12 +100,16 @@ export function useShipmentWithCheckpoints(reference: string) {
 
     const fetchShipment = async () => {
       try {
-        const { data: rows, error: shipmentErr } = await supabase
+        const { data: rows, error: shipmentErr } = await withLookupTimeout<{ data: unknown; error: { code?: string; message?: string } | null }>(supabase
           .from('shipments')
           .select('*')
           .eq(target.column, target.value)
-          .limit(1);
+          .limit(1));
 
+        if (shipmentErr && target.column === 'tracking_number' && isMissingTrackingColumn(shipmentErr)) {
+          if (active) setNotFound(true);
+          return;
+        }
         if (shipmentErr) throw shipmentErr;
         const shipmentData = (rows as Shipment[] | null)?.[0];
         if (!active) return;

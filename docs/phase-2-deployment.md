@@ -94,7 +94,7 @@ Netlify → Site configuration → Environment variables (build scope):
 | `VITE_APP_BASE_URL` | `https://<domain>` |
 | `VITE_WHATSAPP_NUMBER` | Optional bootstrap number until Settings saves one |
 
-Ensure `VITE_DEV_ADMIN_BYPASS`, `VITE_ENABLE_ADMIN_SHORTCUT`, `VITE_DEMO_SUPPORT_ACCESS` and `VITE_SETTINGS_DEV_ADAPTER` are **unset**. They are ignored in production builds anyway.
+Ensure `VITE_DEV_ADMIN_BYPASS`, `VITE_ENABLE_ADMIN_SHORTCUT`, `VITE_ENABLE_DEMO_SHIPMENT` and `VITE_SETTINGS_DEV_ADAPTER` are **unset**. They are ignored in production builds anyway. The development demo shipment (`010101010101`, `src/demo/`) only exists when a dev build has `VITE_ENABLE_DEMO_SHIPMENT=true`. Once real shipments exist, `src/demo/` can be deleted together with its guarded calls in `trackingService`, `useSupabase` and `useChat`.
 
 ## 8. Configure secure SMTP storage and the server function
 

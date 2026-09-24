@@ -10,8 +10,8 @@ import { displayTrackingReference, formatTrackingNumber, isShipmentRecordId, tra
 import { useShipmentWithCheckpoints } from '../../hooks/useSupabase';
 import { formatJourneyStatus, getShipmentJourneyState } from '../utils/shipmentJourney';
 import { brandConfig } from '../../config/brand';
-import { environment } from '../../config/environment';
 import { activeSupportAgent } from '../../config/supportAgents';
+import { isDemoThreadId } from '../../demo/demoChatStore';
 import { supabase } from '../../lib/supabase';
 import type { ChatMessage } from '../../types/chat';
 import type { ShipmentWithCheckpoints } from '../../types/database';
@@ -20,39 +20,55 @@ import { ReplyableMessage } from '../components/chat/ReplyableMessage';
 
 /** trackingId is the shipment record id used by chat; reference is what the customer typed. */
 type ActiveThread = { id: string; trackingId: string; reference: string };
-type ViewMessage = ChatMessage & { delivered?: boolean };
 type ShipmentContext = { trackingId:string; trackingPath:string; status:string; estimatedDelivery:string; destination:string; latestUpdate:string; origin:string; packageLabel:string; routeScreenshot?:string };
 
-const demoActivities = [
-  { time: '09:42 AM', activity: 'Shipment is out with courier for delivery', place: 'Los Angeles, CA' },
-  { time: '07:51 AM', activity: 'Arrived at delivery facility', place: 'Los Angeles, CA' },
-  { time: '21:04', activity: 'Processed at sorting facility', place: 'San Bernardino, CA' },
-];
 const readableDate = (value?: string | null) => value && Number.isFinite(new Date(value).getTime()) ? new Date(value).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : 'Not provided';
+const assetUrl = (value: string, bucket: string) => value.startsWith('http') || value.startsWith('data:') || value.startsWith('/') ? value : supabase.storage.from(bucket).getPublicUrl(value).data.publicUrl;
 
-function realShipmentContext(reference:string, shipment:ShipmentWithCheckpoints|null):ShipmentContext {
+function shipmentContext(reference:string, shipment:ShipmentWithCheckpoints|null):ShipmentContext {
   const latest=[...(shipment?.checkpoints||[])].filter(point=>point.status!=='pending').sort((a,b)=>b.checkpoint_order-a.checkpoint_order)[0];
   const route=shipment?.route_screenshot_url;
   const trackingRef=shipment?trackingReferenceFor(shipment):reference;
-  return { trackingId:shipment?displayTrackingReference(shipment):formatTrackingNumber(reference), trackingPath:`/track/${encodeURIComponent(trackingRef)}`, status:shipment?formatJourneyStatus(getShipmentJourneyState(shipment).status):'Shipment', estimatedDelivery:readableDate(shipment?.estimated_delivery_at), destination:shipment?.delivery_address||'Not available', latestUpdate:latest?`Checkpoint recorded in ${latest.location}`:'No checkpoints recorded', origin:shipment?.pickup_location||'Origin not provided', packageLabel:shipment?.package_name||'Shipment', routeScreenshot:route?(route.startsWith('http')||route.startsWith('data:')?route:supabase.storage.from('route-screenshots').getPublicUrl(route).data.publicUrl):undefined };
+  return { trackingId:shipment?displayTrackingReference(shipment):formatTrackingNumber(reference), trackingPath:`/track/${encodeURIComponent(trackingRef)}`, status:shipment?formatJourneyStatus(getShipmentJourneyState(shipment).status):'Shipment', estimatedDelivery:readableDate(shipment?.estimated_delivery_at), destination:shipment?.delivery_address||'Not available', latestUpdate:latest?`Latest checkpoint: ${latest.location}`:'No checkpoints recorded', origin:shipment?.pickup_location||'Origin not provided', packageLabel:shipment?.package_name||'Shipment', routeScreenshot:route?assetUrl(route,'route-screenshots'):undefined };
 }
-const demoShipmentContext=(trackingId:string):ShipmentContext=>({trackingId:formatTrackingNumber(trackingId),trackingPath:`/track/${encodeURIComponent(trackingId)}`,status:'In Transit',estimatedDelivery:'Today',destination:'Los Angeles, CA',latestUpdate:'Shipment is out with courier for delivery',origin:'San Bernardino, CA',packageLabel:'1 Piece'});
 
-function ShipmentContextPanel({context,demo,onDetails}:{context:ShipmentContext;demo:boolean;onDetails:()=>void}) { return <div className="dhl-chat-context-inner"><span className="dhl-eyebrow">Shipment context</span><h2>Delivery at a glance</h2>{demo&&<span className="dhl-demo-label">Local preview · sample updates</span>}<span className="dhl-chat-status-badge">{context.status}</span><dl><div><dt>TRACKING NUMBER</dt><dd>{context.trackingId}</dd></div><div><dt>ESTIMATED DELIVERY</dt><dd>{context.estimatedDelivery}</dd></div><div><dt>DESTINATION</dt><dd>{context.destination}</dd></div><div><dt>LATEST UPDATE</dt><dd>{context.latestUpdate}</dd></div></dl><div className="dhl-chat-route-preview"><span className="dhl-eyebrow">Shipment route</span>{context.routeScreenshot?<img src={context.routeScreenshot} alt="Recorded shipment route"/>:<div className="dhl-chat-route-stops"><span><MapPin size={17}/>{context.origin}</span><span><Truck size={17}/>{context.destination}</span></div>}</div>{demo?<button className="dhl-chat-full-tracking" type="button" onClick={onDetails}>Preview details <ChevronRight size={16}/></button>:<Link className="dhl-chat-full-tracking" to={context.trackingPath}>View Full Tracking <ChevronRight size={16}/></Link>}</div>; }
+function ShipmentContextPanel({context}:{context:ShipmentContext}) { return <div className="dhl-chat-context-inner"><span className="dhl-eyebrow">Shipment context</span><h2>Delivery at a glance</h2><span className="dhl-chat-status-badge">{context.status}</span><dl><div><dt>TRACKING NUMBER</dt><dd>{context.trackingId}</dd></div><div><dt>ESTIMATED DELIVERY</dt><dd>{context.estimatedDelivery}</dd></div><div><dt>DESTINATION</dt><dd>{context.destination}</dd></div><div><dt>LATEST UPDATE</dt><dd>{context.latestUpdate}</dd></div></dl><div className="dhl-chat-route-preview"><span className="dhl-eyebrow">Shipment route</span>{context.routeScreenshot?<img src={context.routeScreenshot} alt="Recorded shipment route"/>:<div className="dhl-chat-route-stops"><span><MapPin size={17}/>{context.origin}</span><span><Truck size={17}/>{context.destination}</span></div>}</div><Link className="dhl-chat-full-tracking" to={context.trackingPath}>View Full Tracking <ChevronRight size={16}/></Link></div>; }
 
-function ShipmentMessageCard({context,demo,onDetails}:{context:ShipmentContext;demo:boolean;onDetails:()=>void}) { return <article className="dhl-chat-shipment-card"><div className="dhl-chat-shipment-top"><span className="dhl-chat-shipment-icon"><Package size={19}/></span><div><small>TRACKING NUMBER</small><strong>{context.trackingId}</strong></div><span className="dhl-chat-status-badge">{context.status}</span></div><p>{context.packageLabel}</p>{demo?<div className="dhl-chat-activity">{demoActivities.map(item=><div key={item.time}><time>{item.time}</time><span><strong>{item.activity}</strong><small>{item.place}</small></span></div>)}</div>:<p className="dhl-chat-latest">{context.latestUpdate}</p>}<button className="dhl-chat-card-link" type="button" onClick={onDetails}>View Details <ChevronRight size={16}/></button></article>; }
+function ShipmentMessageCard({context,onDetails}:{context:ShipmentContext;onDetails:()=>void}) { return <article className="dhl-chat-shipment-card"><div className="dhl-chat-shipment-top"><span className="dhl-chat-shipment-icon"><Package size={19}/></span><div><small>TRACKING NUMBER</small><strong>{context.trackingId}</strong></div><span className="dhl-chat-status-badge">{context.status}</span></div><p>{context.packageLabel}</p><p className="dhl-chat-latest">{context.latestUpdate}</p><button className="dhl-chat-card-link" type="button" onClick={onDetails}>View Details <ChevronRight size={16}/></button></article>; }
 
-function ChatView({context,messages,loading,demo,typing,onBack,onSend}:{context:ShipmentContext;messages:ViewMessage[];loading:boolean;demo:boolean;typing:boolean;onBack:()=>void;onSend:(text:string,file:File|null,replyTo:ChatMessage|null)=>Promise<string|null>}) {
+/**
+ * `developmentDemo` marks the local demo conversation (shipment 010101010101):
+ * attachments are off and a small note explains it is shared with Admin Chat.
+ */
+function ChatView({context,messages,loading,developmentDemo,onBack,onSend}:{context:ShipmentContext;messages:ChatMessage[];loading:boolean;developmentDemo:boolean;onBack:()=>void;onSend:(text:string,file:File|null,replyTo:ChatMessage|null)=>Promise<string|null>}) {
   const [detailsOpen,setDetailsOpen]=useState(false); const [replyTo,setReplyTo]=useState<ChatMessage|null>(null); const [following,setFollowing]=useState(true); const [newCount,setNewCount]=useState(0); const bottom=useRef<HTMLDivElement>(null); const scroller=useRef<HTMLDivElement>(null); const agent=activeSupportAgent();
-  useEffect(()=>{if(following)bottom.current?.scrollIntoView({block:'end'});else if(messages.length)setNewCount(count=>count+1);},[messages.length,typing]);
+  useEffect(()=>{if(following)bottom.current?.scrollIntoView({block:'end'});else if(messages.length)setNewCount(count=>count+1);},[messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>{if(!detailsOpen)return;const close=(event:KeyboardEvent)=>{if(event.key==='Escape')setDetailsOpen(false);};window.addEventListener('keydown',close);return()=>window.removeEventListener('keydown',close);},[detailsOpen]);
   const onScroll=()=>{const area=scroller.current;if(!area)return;const near=area.scrollHeight-area.scrollTop-area.clientHeight<88;setFollowing(near);if(near)setNewCount(0);}; const latest=()=>{setFollowing(true);setNewCount(0);bottom.current?.scrollIntoView({behavior:'smooth',block:'end'});};
-  return <div className="dhl-chat-shell"><section className="dhl-conversation" aria-label="Shipment support conversation"><header className="dhl-chat-header"><button className="dhl-icon-button" type="button" onClick={onBack} aria-label="Back to customer support"><ArrowLeft size={21}/></button><img className="dhl-chat-header-agent" src={agent.avatar} alt=""/><div className="dhl-chat-header-title"><strong>{agent.name}</strong><span><i/> DHL Shipment Support · Online</span></div><button className="dhl-icon-button dhl-chat-info" type="button" onClick={()=>setDetailsOpen(true)} aria-label="Shipment details"><Info size={21}/></button></header><div className="dhl-chat-ref"><span className="dhl-chat-ref-icon"><Package size={18}/></span><span><small>TRACKING NUMBER</small><strong>{context.trackingId}</strong></span><span className="dhl-chat-status-badge">{context.status}</span></div><div ref={scroller} onScroll={onScroll} className="dhl-chat-messages" role="log" aria-live="polite" aria-label="Conversation messages">{demo&&<p className="dhl-chat-preview-note">Local preview — messages here are not sent to DHL support.</p>}{loading&&<p className="dhl-chat-empty">Loading messages…</p>}{!loading&&!demo&&!messages.length&&<p className="dhl-chat-empty">Your conversation is ready. Send a message to shipment support.</p>}{!demo&&<ShipmentMessageCard context={context} demo={false} onDetails={()=>setDetailsOpen(true)}/>} {messages.map((message,index)=><div key={message.id}><ReplyableMessage message={message} activeRole="user" onReply={setReplyTo}/>{demo&&index===1&&<ShipmentMessageCard context={context} demo onDetails={()=>setDetailsOpen(true)}/>}</div>)}{typing&&<div className="dhl-chat-message dhl-chat-typing"><span className="dhl-chat-avatar"><img src={agent.avatar} alt=""/></span><div><small>{agent.name} is typing…</small><span className="dhl-typing-dots"><i/><i/><i/></span></div></div>}<div ref={bottom}/></div>{newCount>0&&<button type="button" className="dhl-chat-new-message" onClick={latest}>New message ↓</button>}<ChatComposer replyTo={replyTo} onCancelReply={()=>setReplyTo(null)} attachmentDisabled={demo} onSend={(text,file)=>onSend(text,file,replyTo)}/></section><aside className="dhl-chat-context"><ShipmentContextPanel context={context} demo={demo} onDetails={()=>setDetailsOpen(true)}/></aside>{detailsOpen&&<div className="dhl-chat-details-layer" onMouseDown={event=>{if(event.target===event.currentTarget)setDetailsOpen(false);}}><section className="dhl-chat-details-dialog" role="dialog" aria-modal="true" aria-label="Shipment details"><button className="dhl-chat-details-close" type="button" onClick={()=>setDetailsOpen(false)} aria-label="Close shipment details"><X size={21}/></button><ShipmentContextPanel context={context} demo={demo} onDetails={()=>setDetailsOpen(false)}/></section></div>}</div>;
+  // The shipment card follows the opening exchange when there is one.
+  const cardAfter=messages.length>=3?2:-1;
+  const card=<ShipmentMessageCard context={context} onDetails={()=>setDetailsOpen(true)}/>;
+  return <div className="dhl-chat-shell"><section className="dhl-conversation" aria-label="Shipment support conversation"><header className="dhl-chat-header"><button className="dhl-icon-button" type="button" onClick={onBack} aria-label="Back to customer support"><ArrowLeft size={21}/></button><img className="dhl-chat-header-agent" src={agent.avatar} alt=""/><div className="dhl-chat-header-title"><strong>{agent.name}</strong><span><i/> DHL Shipment Support · Online</span></div><button className="dhl-icon-button dhl-chat-info" type="button" onClick={()=>setDetailsOpen(true)} aria-label="Shipment details"><Info size={21}/></button></header><div className="dhl-chat-ref"><span className="dhl-chat-ref-icon"><Package size={18}/></span><span><small>TRACKING NUMBER</small><strong>{context.trackingId}</strong></span><span className="dhl-chat-status-badge">{context.status}</span></div>
+    <div ref={scroller} onScroll={onScroll} className="dhl-chat-messages" role="log" aria-live="polite" aria-label="Conversation messages">
+      {developmentDemo&&<p className="dhl-chat-preview-note">Development demo conversation · shared with Admin Chat in this browser</p>}
+      {loading&&<p className="dhl-chat-empty">Loading messages…</p>}
+      {!loading&&!messages.length&&<p className="dhl-chat-empty">Your conversation is ready. Send a message to shipment support.</p>}
+      {cardAfter<0&&card}
+      {messages.map((message,index)=><div key={message.id}><ReplyableMessage message={message} activeRole="user" onReply={setReplyTo}/>{index===cardAfter&&card}</div>)}
+      <div ref={bottom}/>
+    </div>
+    {newCount>0&&<button type="button" className="dhl-chat-new-message" onClick={latest}>New message ↓</button>}
+    <ChatComposer replyTo={replyTo} onCancelReply={()=>setReplyTo(null)} attachmentDisabled={developmentDemo} onSend={(text,file)=>onSend(text,file,replyTo)}/></section>
+    <aside className="dhl-chat-context"><ShipmentContextPanel context={context}/></aside>
+    {detailsOpen&&<div className="dhl-chat-details-layer" onMouseDown={event=>{if(event.target===event.currentTarget)setDetailsOpen(false);}}><section className="dhl-chat-details-dialog" role="dialog" aria-modal="true" aria-label="Shipment details"><button className="dhl-chat-details-close" type="button" onClick={()=>setDetailsOpen(false)} aria-label="Close shipment details"><X size={21}/></button><ShipmentContextPanel context={context}/></section></div>}</div>;
 }
 
-function RealConversation({thread,onBack}:{thread:ActiveThread;onBack:()=>void}) { const {messages,loading}=useChatMessages(thread.trackingId,thread.id);const {shipment}=useShipmentWithCheckpoints(thread.trackingId);useEffect(()=>{void markThreadRead(thread.id,'user');},[thread.id,messages.length]);return <ChatView context={realShipmentContext(thread.reference,shipment)} messages={messages} loading={loading} demo={false} typing={false} onBack={onBack} onSend={async(text,file,replyTo)=>{const result=await sendChatMessage({trackingId:thread.trackingId,threadId:thread.id,sender:'user',text,mediaFiles:file?[file]:[],replyToMessageId:replyTo?.id});return result.error||null;}}/>; }
-function initialDemoMessages(trackingId:string):ViewMessage[]{const now=Date.now();const agent=activeSupportAgent();const first:ViewMessage={id:'demo-customer-1',trackingId,sender:'user',text:'Hi, can you please tell me the current status of my shipment?',createdAt:now-240000,delivered:true};return [first,{id:'demo-support-1',trackingId,sender:'admin',text:'Hello 👋 Thanks for contacting DHL Shipment Support. I’ve checked the latest updates for your shipment.',createdAt:now-180000,senderName:agent.name,senderAvatarUrl:agent.avatar,supportProfileId:agent.id},{id:'demo-support-2',trackingId,sender:'admin',text:'Your shipment is currently with our courier and is scheduled for delivery today. We’ll keep you updated if anything changes.',createdAt:now-120000,senderName:agent.name,senderAvatarUrl:agent.avatar,supportProfileId:agent.id},{id:'demo-customer-2',trackingId,sender:'user',text:'Great, thank you!',createdAt:now-60000,delivered:true}];}
-function DemoConversation({trackingId,onBack}:{trackingId:string;onBack:()=>void}) { const [messages,setMessages]=useState<ViewMessage[]>(()=>initialDemoMessages(trackingId));const [typing,setTyping]=useState(false);const timer=useRef<number|null>(null);useEffect(()=>()=>{if(timer.current!==null)window.clearTimeout(timer.current);},[]);const onSend=async(text:string,_file:File|null,replyTo:ChatMessage|null)=>{if(!text.trim())return null;const user:ViewMessage={id:`demo-user-${Date.now()}`,trackingId,sender:'user',text,createdAt:Date.now(),delivered:true,replyToMessageId:replyTo?.id,replyTo:replyTo?{id:replyTo.id,sender:replyTo.sender,senderName:replyTo.senderName,text:replyTo.text,media:replyTo.media,supportProfileId:replyTo.supportProfileId}:undefined};setMessages(current=>[...current,user]);setTyping(true);if(timer.current!==null)window.clearTimeout(timer.current);timer.current=window.setTimeout(()=>{const agent=activeSupportAgent();setTyping(false);setMessages(current=>[...current,{id:`demo-support-${Date.now()}`,trackingId,sender:'admin',text:'Thanks for your message. This local preview is not connected to a live support agent.',createdAt:Date.now(),senderName:agent.name,senderAvatarUrl:agent.avatar,supportProfileId:agent.id}]);},1900);return null;};return <ChatView context={demoShipmentContext(trackingId)} messages={messages} loading={false} demo typing={typing} onBack={onBack} onSend={onSend}/>; }
+function Conversation({thread,onBack}:{thread:ActiveThread;onBack:()=>void}) {
+  const {messages,loading}=useChatMessages(thread.trackingId,thread.id);
+  const {shipment}=useShipmentWithCheckpoints(thread.trackingId);
+  useEffect(()=>{void markThreadRead(thread.id,'user');},[thread.id,messages.length]);
+  return <ChatView context={shipmentContext(thread.reference,shipment)} messages={messages} loading={loading} developmentDemo={isDemoThreadId(thread.id)} onBack={onBack} onSend={async(text,file,replyTo)=>{const result=await sendChatMessage({trackingId:thread.trackingId,threadId:thread.id,sender:'user',text,mediaFiles:file?[file]:[],replyToMessageId:replyTo?.id});return result.error||null;}}/>;
+}
 
 type GateIssue = 'chat_unavailable' | null;
 
@@ -62,7 +78,7 @@ type GateIssue = 'chat_unavailable' | null;
  */
 export default function UserChat(){
   const [params]=useSearchParams();const navigate=useNavigate();const fieldId=useId();const input=useRef<HTMLInputElement>(null);
-  const [thread,setThread]=useState<ActiveThread|null>(null);const [demoId,setDemoId]=useState<string|null>(null);const [issue,setIssue]=useState<GateIssue>(null);const [opening,setOpening]=useState(false);
+  const [thread,setThread]=useState<ActiveThread|null>(null);const [issue,setIssue]=useState<GateIssue>(null);const [opening,setOpening]=useState(false);const [charWarning,setCharWarning]=useState(false);
   const openTimer=useRef<number|null>(null);
   const openShipment=async(shipmentId:string,reference:string)=>{
     setOpening(true);setIssue(null);
@@ -70,34 +86,32 @@ export default function UserChat(){
     if(!active){setOpening(false);setIssue('chat_unavailable');return;}
     openTimer.current=window.setTimeout(()=>{setOpening(false);setThread({id:active.id,trackingId:active.trackingId,reference});},400);
   };
-  const lookup=useTrackingLookup({onFound:(shipment,digits)=>{if(environment.demoSupportAccess)return;void openShipment(shipment.shipmentId,shipment.trackingNumber||digits);}});
+  const lookup=useTrackingLookup({onFound:(shipment,digits)=>{void openShipment(shipment.shipmentId,shipment.trackingNumber||digits);}});
   const {digits,phase,searchedNumber,start}=lookup;
   const initial=params.get('id')?.trim()||'';
   useEffect(()=>{if(!initial)return;if(isShipmentRecordId(initial)){void openShipment(initial,initial);return;}start(initial);},[initial]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(()=>()=>{if(openTimer.current!==null)window.clearTimeout(openTimer.current);},[]);
-  // Local preview: any complete number opens the sample conversation.
-  useEffect(()=>{if(!environment.demoSupportAccess||!searchedNumber)return;if(phase==='found'||phase==='not_found'||phase==='error'){const timer=window.setTimeout(()=>setDemoId(searchedNumber),400);return()=>window.clearTimeout(timer);}},[phase,searchedNumber]);
-  const back=()=>{setThread(null);setDemoId(null);setIssue(null);lookup.setDigits('');navigate('/chat',{replace:true});};
-  if(environment.demoSupportAccess&&demoId)return <DemoConversation key={demoId} trackingId={demoId} onBack={back}/>;
-  if(thread)return <RealConversation thread={thread} onBack={back}/>;
+  const back=()=>{setThread(null);setIssue(null);lookup.setDigits('');navigate('/chat',{replace:true});};
+  if(thread)return <Conversation thread={thread} onBack={back}/>;
   const busy=phase==='searching'||opening||(phase==='found'&&!issue);
   const submit=(event:FormEvent)=>{event.preventDefault();setIssue(null);if(phase==='error'){lookup.retry();return;}if(phase==='found'&&issue==='chat_unavailable'){lookup.retry();return;}if(!lookup.submit())input.current?.focus();};
   const helperId=`${fieldId}-status`;
   const status=issue==='chat_unavailable'?<span className="dhl-support-signin">We found your shipment, but a support conversation needs you to sign in with the email linked to it. <Link to={`/signin?next=${encodeURIComponent(`/chat?id=${searchedNumber||digits}`)}`}>Sign in</Link></span>
+    :charWarning?<span className="dhl-error-text">Tracking numbers can contain numbers only.</span>
     :phase==='searching'||opening?<><span className="dhl-support-spinner"/> {opening?'Opening your conversation…':'Checking shipment…'}</>
     :phase==='found'?<><ShieldCheck size={17}/> Shipment found</>
-    :phase==='not_found'?<span className="dhl-error-text">We couldn’t find a shipment with that tracking number. Check the 12 digits on your receipt.</span>
-    :phase==='error'?<span className="dhl-error-text">We’re having trouble checking this shipment right now. Please try again.</span>
+    :phase==='not_found'?<span className="dhl-error-text">We couldn’t find a shipment matching this tracking number. Check the 12 digits on your receipt.</span>
+    :phase==='error'?<span className="dhl-error-text">We’re having trouble checking this shipment right now. This is a connection problem on our side, not a problem with your tracking number.</span>
     :phase==='incomplete'?<span className="dhl-error-text">Enter the complete 12-digit tracking number.</span>
     :phase==='typing'?<span className="dhl-support-neutral">Tracking numbers contain 12 digits.</span>
     :phase==='ready'?<span className="dhl-support-neutral">Checking automatically…</span>
     :null;
   return <section className="dhl-support-page"><picture className="dhl-support-background" aria-hidden="true"><source media="(min-width: 900px) and (orientation: landscape)" srcSet={brandConfig.cinematicLandscape.webp} type="image/webp"/><source media="(min-width: 900px) and (orientation: landscape)" srcSet={brandConfig.cinematicLandscape.fallback} type="image/jpeg"/><source srcSet={brandConfig.cinematicPortrait.webp} type="image/webp"/><img src={brandConfig.cinematicPortrait.fallback} alt=""/></picture><div className="dhl-support-wash" aria-hidden="true"/>
-    <div className="dhl-support-gate"><Link className="dhl-support-back" to="/home"><ArrowLeft size={18}/> Back</Link><span className="dhl-support-page-label">Customer Support</span><div className="dhl-support-gate-icon"><Headphones size={30}/></div><span className="dhl-eyebrow">Shipment support</span><h1>Connect to<br/>Shipment Support</h1><p>Enter your 12-digit tracking number to start a support conversation linked to your shipment.</p>
-      <form onSubmit={submit} noValidate><label htmlFor={fieldId}>Tracking number</label><div className={`dhl-support-input-wrap${phase==='incomplete'?' invalid':''}`}><Package size={19} aria-hidden="true"/><TrackingNumberInput id={fieldId} ref={input} value={digits} onValueChange={value=>{setIssue(null);lookup.setDigits(value);}} placeholder="0000 0000 0000" aria-describedby={helperId} aria-invalid={phase==='incomplete'}/></div>
+    <div className="dhl-support-gate"><div className="dhl-support-gate-icon"><Headphones size={30}/></div><span className="dhl-eyebrow">Customer support</span><h1>Connect to<br/>Shipment Support</h1><p>Enter your 12-digit tracking number to start a support conversation linked to your shipment.</p>
+      <form onSubmit={submit} noValidate><label htmlFor={fieldId}>Tracking number</label><div className={`dhl-support-input-wrap${phase==='incomplete'||charWarning?' invalid':''}`}><Package size={19} aria-hidden="true"/><TrackingNumberInput id={fieldId} ref={input} value={digits} onRejectedInput={()=>setCharWarning(true)} onValueChange={value=>{if(value!==digits)setCharWarning(false);setIssue(null);lookup.setDigits(value);}} placeholder="0000 0000 0000" aria-describedby={helperId} aria-invalid={phase==='incomplete'||charWarning}/></div>
         <div id={helperId} className="dhl-support-verification" role="status" aria-live="polite">{status}</div>
         <button className="dhl-support-continue" type="submit" disabled={busy}>{phase==='error'?'Try Again':'Continue to Support'} <ChevronRight size={18}/></button>
-        <WhatsAppSupportButton trackingId={digits.length===12?digits:null} className="dhl-support-alt"><WhatsAppIcon size={18}/> Chat on WhatsApp instead</WhatsAppSupportButton>
+        <WhatsAppSupportButton trackingId={digits.length===12?digits:null} className="dhl-whatsapp-action dhl-support-alt"><WhatsAppIcon size={18}/> Chat on WhatsApp instead</WhatsAppSupportButton>
       </form>
-      <p className="dhl-support-helper"><ShieldCheck size={17}/> {environment.demoSupportAccess?'Local preview: any 12-digit tracking number opens a sample chat. No messages are sent.':'Access to a real conversation is verified by the shipment support service.'}</p></div></section>;
+      <p className="dhl-support-helper"><ShieldCheck size={17}/> Access to a conversation is verified by the shipment support service.</p></div></section>;
 }
