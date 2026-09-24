@@ -1,7 +1,7 @@
 import React, { createContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import * as shipmentService from '../../services/shipmentService';
 import { supabase } from '../../lib/supabase';
-import type { Shipment as DBShipment, Checkpoint as DBCheckpoint, ShipmentWithCheckpoints } from '../../types/database';
+import type { Shipment as DBShipment, Checkpoint as DBCheckpoint, ShipmentDetails, ShipmentWithCheckpoints } from '../../types/database';
 
 export interface Checkpoint extends DBCheckpoint {
   id: string;
@@ -11,6 +11,10 @@ export interface Checkpoint extends DBCheckpoint {
 
 export interface Shipment {
   id: string;
+  /** Customer-facing 12-digit number (null until the tracking-number migration is applied). */
+  trackingNumber?: string | null;
+  /** Structured wizard details (null until the shipment-details migration is applied). */
+  details?: ShipmentDetails | null;
   createdAt?: string;
   updatedAt?: string;
   estimatedDeliveryAt?: string | null;
@@ -179,6 +183,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           console.log(`📦 Transforming shipment ${ship.id} with ${ship.checkpoints?.length || 0} checkpoints`);
           return {
             id: ship.id,
+            trackingNumber: ship.tracking_number || null,
+            details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
             estimatedDeliveryAt: ship.estimated_delivery_at,
@@ -330,6 +336,11 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           stopped: false,
         };
 
+        // Structured wizard details are written only once the column exists.
+        if (data.details && await shipmentService.supportsShipmentDetails()) {
+          shipmentData.shipment_details = data.details;
+        }
+
         console.log('📝 Shipment Data to save:', shipmentData);
 
         const { data: newShipment, error } = await shipmentService.createShipment(shipmentData);
@@ -378,6 +389,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments && refreshedShipments.length > 0) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship) => ({
             id: ship.id,
+            trackingNumber: ship.tracking_number || null,
+            details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
             estimatedDeliveryAt: ship.estimated_delivery_at,
@@ -485,6 +498,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            trackingNumber: ship.tracking_number || null,
+            details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
             estimatedDeliveryAt: ship.estimated_delivery_at,
@@ -551,6 +566,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            trackingNumber: ship.tracking_number || null,
+            details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
             estimatedDeliveryAt: ship.estimated_delivery_at,
@@ -643,6 +660,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            trackingNumber: ship.tracking_number || null,
+            details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
             estimatedDeliveryAt: ship.estimated_delivery_at,
@@ -703,6 +722,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
         if (refreshedShipments) {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
+            trackingNumber: ship.tracking_number || null,
+            details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
             estimatedDeliveryAt: ship.estimated_delivery_at,

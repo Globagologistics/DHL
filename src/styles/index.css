@@ -10,6 +10,7 @@
 @import './admin-detail.css';
 @import './admin-chat.css';
 @import './admin-operations.css';
+@import './admin-experience.css';
 
 /* Premium Animations */
 @keyframes blob {

@@ -26,6 +26,23 @@ async function withTimeout<T>(promise: Promise<T>, timeoutMessage: string): Prom
   }
 }
 
+let detailsColumnSupport: Promise<boolean> | null = null;
+
+/** True once migration 20260925000001 has added shipments.shipment_details. */
+export function supportsShipmentDetails(): Promise<boolean> {
+  detailsColumnSupport ??= Promise.resolve(supabase.from('shipments').select('shipment_details').limit(1))
+    .then((result: { error: unknown }) => !result.error)
+    .catch(() => false);
+  return detailsColumnSupport;
+}
+
+/** Reads the database-assigned 12-digit tracking number, if the column exists. */
+export async function getTrackingNumber(shipmentId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('shipments').select('*').eq('id', shipmentId).limit(1);
+  if (error) return null;
+  return (data as Shipment[] | null)?.[0]?.tracking_number ?? null;
+}
+
 export async function createShipment(shipmentData: Partial<Shipment>) {
   try {
     console.log('📦 Creating shipment with ID:', shipmentData.id);
