@@ -2,6 +2,7 @@
 @import './tailwind.css';
 @import './theme.css';
 @import './customer.css';
+@import './entry-pages.css';
 
 /* Premium Animations */
 @keyframes blob {

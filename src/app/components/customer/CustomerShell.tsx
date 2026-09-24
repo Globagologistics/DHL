@@ -23,6 +23,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const special = location.pathname === '/' || location.pathname === '/chat';
+  const isHome = location.pathname === '/home';
   useEffect(() => setDrawerOpen(false), [location.pathname]);
   useEffect(() => {
     if (!drawerOpen) return;
@@ -30,12 +31,12 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
     window.addEventListener('keydown', onEscape);
     return () => window.removeEventListener('keydown', onEscape);
   }, [drawerOpen]);
-  return <div className="dhl-app">
+  return <div className={`dhl-app${isHome ? ' dhl-app-home' : ''}`}>
     {!special && <header className="dhl-header"><div className="dhl-header-inner">
       <button className="dhl-icon-button dhl-menu-button" onClick={() => setDrawerOpen(true)} aria-label="Open navigation"><Menu size={22}/></button>
       <BrandLogo/>
       <nav className="dhl-desktop-nav" aria-label="Main navigation">
-        <Link to="/home">Home</Link><Link to="/track">Track</Link><Link to="/send-shipment">Send a Shipment</Link><Link to="/chat">Support</Link>
+        {isHome ? <><Link to="/track">Track Shipment</Link><Link to="/send-shipment">Send Shipment</Link><Link to="/locations">Service Points</Link><Link to="/chat">Support</Link></> : <><Link to="/home">Home</Link><Link to="/track">Track</Link><Link to="/send-shipment">Send a Shipment</Link><Link to="/chat">Support</Link></>}
       </nav>
       <div className="dhl-header-actions"><Link className="dhl-icon-button" to="/settings#notifications" aria-label="Notifications"><Bell size={20}/></Link><Link className="dhl-signin" to="/signin"><UserRound size={17}/> Sign in</Link></div>
     </div></header>}

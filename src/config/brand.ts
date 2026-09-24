@@ -11,5 +11,14 @@ export const brandConfig = {
   logo: '/dhl-concept-logo.svg',
   favicon: '/dhl-concept-icon.svg',
   campaignImage: '/images/dhl-logistics-campaign.jpeg',
+  cinematicLogo: '/dhl-cinematic-logo.svg',
+  cinematicPortrait: {
+    webp: '/images/dhl-cinematic-portrait.webp',
+    fallback: '/images/dhl-cinematic-portrait.jpg',
+  },
+  cinematicLandscape: {
+    webp: '/images/dhl-cinematic-landscape.webp',
+    fallback: '/images/dhl-cinematic-landscape.jpg',
+  },
   themeColor: '#FFCC00',
 } as const;

@@ -1,0 +1,542 @@
+/* Scoped cinematic treatment for the welcome and Home routes only. */
+.dhl-welcome-cinematic {
+  position: relative;
+  display: block;
+  isolation: isolate;
+  min-height: 100svh;
+  min-height: 100dvh;
+  overflow: hidden;
+  color: #fff;
+  background: #172a39;
+}
+
+.dhl-welcome-cinematic .dhl-welcome-photo,
+.dhl-app-home .dhl-home-media {
+  position: absolute;
+  inset: 0;
+  display: block;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.dhl-welcome-cinematic .dhl-welcome-photo img,
+.dhl-app-home .dhl-home-media img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.dhl-welcome-cinematic .dhl-welcome-photo img {
+  object-position: 55% 49%;
+  animation: dhl-scene-arrive 650ms ease-out both;
+}
+
+.dhl-welcome-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(6, 14, 22, .85) 0%, rgba(6, 14, 22, .59) 33%, rgba(6, 14, 22, .12) 69%, rgba(6, 14, 22, .02) 100%),
+    linear-gradient(0deg, rgba(5, 8, 12, .68) 0%, transparent 53%);
+  pointer-events: none;
+}
+
+.dhl-welcome-cinematic .dhl-welcome-copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  width: min(100%, 1320px);
+  min-height: 100svh;
+  min-height: 100dvh;
+  margin-inline: auto;
+  padding: max(32px, calc(env(safe-area-inset-top) + 22px)) clamp(30px, 5vw, 76px) max(54px, calc(env(safe-area-inset-bottom) + 32px));
+}
+
+.dhl-welcome-logo {
+  display: inline-flex;
+  align-self: flex-start;
+  align-items: center;
+  width: 145px;
+  min-height: 45px;
+  animation: dhl-logo-arrive 450ms 150ms ease-out both;
+}
+
+.dhl-welcome-logo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, .22));
+}
+
+.dhl-welcome-cinematic .dhl-welcome-content {
+  max-width: 710px;
+  margin-top: auto;
+  padding: 0;
+}
+
+.dhl-welcome-cinematic .dhl-eyebrow {
+  color: var(--dhl-yellow);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: .2em;
+  animation: dhl-rise-in 400ms 350ms ease-out both;
+}
+
+.dhl-welcome-cinematic h1 {
+  margin: 15px 0 21px;
+  color: #fff;
+  font-size: clamp(58px, 5.4vw, 76px);
+  font-weight: 800;
+  line-height: .99;
+  letter-spacing: -.055em;
+  text-wrap: balance;
+}
+
+.dhl-welcome-cinematic h1 span {
+  display: block;
+  animation: dhl-rise-in 450ms ease-out both;
+}
+
+.dhl-welcome-cinematic h1 span:nth-child(1) { animation-delay: 450ms; }
+.dhl-welcome-cinematic h1 span:nth-child(2) { animation-delay: 540ms; }
+.dhl-welcome-cinematic h1 span:nth-child(3) { animation-delay: 630ms; }
+.dhl-welcome-cinematic h1 .dhl-welcome-highlight { color: var(--dhl-yellow); }
+
+.dhl-welcome-cinematic p {
+  max-width: 520px;
+  margin: 0;
+  color: rgba(255, 255, 255, .88);
+  font-size: 18px;
+  line-height: 1.5;
+  animation: dhl-rise-in 450ms 730ms ease-out both;
+}
+
+.dhl-welcome-cta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  width: 220px;
+  min-height: 58px;
+  margin-top: 33px;
+  border: 1px solid var(--dhl-yellow);
+  border-radius: 15px;
+  background: var(--dhl-yellow);
+  color: var(--dhl-ink);
+  font-size: 16px;
+  font-weight: 800;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, .22);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+  animation: dhl-rise-in 400ms 880ms ease-out both, dhl-cta-pulse 2.1s 1300ms ease-in-out infinite;
+}
+
+.dhl-welcome-cta:hover {
+  background: #ffda3d;
+  box-shadow: 0 11px 28px rgba(0, 0, 0, .3);
+}
+
+.dhl-welcome-cinematic :focus-visible {
+  outline: 3px solid var(--dhl-yellow);
+  outline-offset: 5px;
+}
+
+.dhl-app-home {
+  background: var(--dhl-page);
+}
+
+.dhl-app-home .dhl-header {
+  background: #fff;
+  border-bottom: 1px solid var(--dhl-border);
+}
+
+.dhl-app-home .dhl-desktop-nav a {
+  color: var(--dhl-text);
+  font-weight: 700;
+}
+
+.dhl-app-home .dhl-desktop-nav a:hover,
+.dhl-app-home .dhl-header-actions a:hover {
+  color: var(--dhl-red);
+}
+
+.dhl-app-home .dhl-home-hero {
+  padding: 28px 0 0;
+  background: transparent;
+}
+
+.dhl-app-home .dhl-home-layout {
+  position: relative;
+  display: block;
+  isolation: isolate;
+  height: clamp(480px, 43vw, 570px);
+  overflow: hidden;
+  border-radius: 28px;
+  background: #1e3240;
+  box-shadow: 0 18px 48px rgba(22, 28, 35, .15);
+}
+
+.dhl-app-home .dhl-home-media img {
+  object-position: 55% 24%;
+}
+
+.dhl-home-shade {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background:
+    linear-gradient(90deg, rgba(7, 16, 24, .88) 0%, rgba(7, 16, 24, .67) 39%, rgba(7, 16, 24, .06) 79%),
+    linear-gradient(0deg, rgba(4, 8, 13, .53), transparent 65%);
+  pointer-events: none;
+}
+
+.dhl-app-home .dhl-home-copy {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  width: min(680px, 60%);
+  height: 100%;
+  padding: clamp(36px, 5vw, 66px);
+  color: #fff;
+}
+
+.dhl-app-home .dhl-home-greeting {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  width: fit-content;
+  margin: 0 0 22px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, .32);
+  border-radius: 999px;
+  background: rgba(8, 15, 22, .25);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  backdrop-filter: blur(8px);
+}
+
+.dhl-app-home .dhl-home-greeting strong {
+  color: var(--dhl-yellow);
+  font-weight: 800;
+}
+
+.dhl-app-home .dhl-home-copy .dhl-eyebrow {
+  margin-bottom: 11px;
+  color: var(--dhl-yellow);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .19em;
+}
+
+.dhl-app-home .dhl-home-copy h1 {
+  max-width: 610px;
+  margin: 0 0 16px;
+  color: #fff;
+  font-size: clamp(40px, 4.2vw, 58px);
+  font-weight: 800;
+  line-height: 1.04;
+  letter-spacing: -.048em;
+  text-wrap: balance;
+}
+
+.dhl-app-home .dhl-home-copy h1 span {
+  color: #fff;
+}
+
+.dhl-app-home .dhl-home-copy p {
+  max-width: 520px;
+  margin: 0 0 26px;
+  color: rgba(255, 255, 255, .86);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.dhl-app-home .dhl-home-copy .dhl-tracking-form {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: min(550px, 100%);
+  min-height: 62px;
+  gap: 0;
+  padding: 4px;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, .23);
+}
+
+.dhl-app-home .dhl-home-copy .dhl-tracking-field {
+  flex: 1 1 auto;
+  height: 54px;
+  min-height: 54px;
+  border: 0;
+  box-shadow: none;
+}
+
+.dhl-app-home .dhl-home-copy .dhl-tracking-field:focus-within {
+  border: 0;
+  box-shadow: inset 0 0 0 2px var(--dhl-red);
+}
+
+.dhl-app-home .dhl-home-copy .dhl-tracking-form .dhl-primary-button {
+  flex: 0 0 54px;
+  width: 54px;
+  min-width: 54px;
+  min-height: 54px;
+  height: 54px;
+  padding: 0;
+  border-radius: 12px;
+  font-size: 0;
+  box-shadow: none;
+}
+
+.dhl-app-home .dhl-home-copy .dhl-tracking-form .dhl-primary-button svg {
+  width: 21px;
+  height: 21px;
+}
+
+.dhl-app-home .dhl-actions {
+  padding: 34px 0 100px;
+}
+
+.dhl-actions-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 19px;
+}
+
+.dhl-section-kicker {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--dhl-red);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+}
+
+.dhl-app-home .dhl-actions h2 {
+  margin: 0;
+  color: var(--dhl-text);
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -.035em;
+}
+
+.dhl-actions-heading p {
+  margin: 0 0 3px;
+  color: var(--dhl-secondary);
+  font-size: 13px;
+}
+
+.dhl-app-home .dhl-action-grid {
+  gap: 15px;
+}
+
+.dhl-app-home .dhl-action {
+  position: relative;
+  min-height: 172px;
+  gap: 8px;
+  padding: 21px;
+  border: 1px solid #ecedef;
+  border-radius: 20px;
+  background: #fff;
+  color: var(--dhl-text);
+  box-shadow: 0 3px 14px rgba(28, 33, 39, .045);
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.dhl-app-home .dhl-action:hover {
+  transform: translateY(-3px);
+  border-color: #e3e4e5;
+  box-shadow: 0 10px 24px rgba(28, 33, 39, .1);
+}
+
+.dhl-app-home .dhl-action-icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border-radius: 13px;
+}
+
+.dhl-app-home .dhl-action.tone-track .dhl-action-icon { background: #fff2b8; color: #8f3c00; }
+.dhl-app-home .dhl-action.tone-send .dhl-action-icon { background: #fdeced; color: var(--dhl-red); }
+.dhl-app-home .dhl-action.tone-support .dhl-action-icon { background: #fff5d7; color: #855500; }
+.dhl-app-home .dhl-action.tone-locations .dhl-action-icon { background: #f0f1f1; color: #555b5d; }
+
+.dhl-app-home .dhl-action strong {
+  padding-right: 14px;
+  font-size: 16px;
+  font-weight: 750;
+  line-height: 1.24;
+}
+
+.dhl-app-home .dhl-action small {
+  max-width: 210px;
+  padding-right: 12px;
+  color: var(--dhl-secondary);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.dhl-action-chevron {
+  position: absolute;
+  right: 18px;
+  bottom: 20px;
+  color: var(--dhl-muted);
+}
+
+.dhl-app-home :focus-visible {
+  outline: 3px solid var(--dhl-red);
+  outline-offset: 3px;
+}
+
+.dhl-welcome-cinematic ::selection,
+.dhl-app-home ::selection {
+  background: var(--dhl-yellow);
+  color: var(--dhl-ink);
+}
+
+@keyframes dhl-scene-arrive {
+  from { opacity: .4; transform: scale(1.04); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes dhl-logo-arrive {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dhl-rise-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes dhl-cta-pulse {
+  0%, 100% { transform: scale(1); box-shadow: 0 10px 24px rgba(0, 0, 0, .22), 0 0 0 0 rgba(255, 204, 0, .35); }
+  50% { transform: scale(1.02); box-shadow: 0 10px 24px rgba(0, 0, 0, .22), 0 0 0 11px rgba(255, 204, 0, 0); }
+}
+
+@media (max-width: 1023px) {
+  .dhl-app-home .dhl-home-layout { height: 490px; }
+  .dhl-app-home .dhl-home-copy { width: min(610px, 70%); }
+}
+
+@media (max-width: 899px) {
+  .dhl-welcome-cinematic .dhl-welcome-photo img { object-position: 53% 50%; }
+  .dhl-welcome-shade {
+    background: linear-gradient(180deg, rgba(6, 13, 20, .2) 0%, rgba(6, 13, 20, .03) 35%, rgba(6, 11, 16, .32) 52%, rgba(3, 7, 11, .79) 76%, rgba(2, 5, 9, .93) 100%);
+  }
+  .dhl-welcome-cinematic .dhl-welcome-copy {
+    min-height: 100svh;
+    min-height: 100dvh;
+    padding: calc(env(safe-area-inset-top) + 22px) clamp(22px, 5vw, 42px) calc(env(safe-area-inset-bottom) + 24px);
+  }
+  .dhl-welcome-logo { width: 123px; min-height: 38px; }
+  .dhl-welcome-cinematic .dhl-welcome-content { max-width: 580px; }
+  .dhl-welcome-cinematic h1 { font-size: clamp(44px, 6.6vw, 66px); }
+}
+
+@media (max-width: 767px) {
+  .dhl-welcome-cinematic .dhl-welcome-copy { padding-inline: 22px; }
+  .dhl-welcome-cinematic .dhl-welcome-content { max-width: none; }
+  .dhl-welcome-cinematic .dhl-eyebrow { font-size: 10px; letter-spacing: .19em; }
+  .dhl-welcome-cinematic h1 {
+    margin: 12px 0 15px;
+    font-size: clamp(43px, 11.5vw, 52px);
+    line-height: 1.01;
+  }
+  .dhl-welcome-cinematic p { max-width: 330px; font-size: 15px; line-height: 1.48; }
+  .dhl-welcome-cta { display: flex; width: 220px; min-height: 56px; margin: 27px auto 0; }
+
+  .dhl-app-home .dhl-header { height: calc(64px + env(safe-area-inset-top)); }
+  .dhl-app-home .dhl-header-inner {
+    display: grid;
+    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    gap: 0;
+    width: calc(100% - 36px);
+    padding-top: env(safe-area-inset-top);
+  }
+  .dhl-app-home .dhl-menu-button { grid-column: 1; justify-self: start; }
+  .dhl-app-home .dhl-header-inner > .dhl-brand-link { grid-column: 2; justify-self: center; }
+  .dhl-app-home .dhl-header-inner > .dhl-brand-link img { width: 105px; height: 34px; }
+  .dhl-app-home .dhl-header-actions { grid-column: 3; justify-self: end; margin-left: 0; }
+
+  .dhl-app-home .dhl-home-hero { padding: 17px 0 0; }
+  .dhl-app-home .dhl-home-hero .dhl-container { width: calc(100% - 34px); }
+  .dhl-app-home .dhl-home-layout { height: clamp(410px, 112vw, 460px); border-radius: 24px; }
+  .dhl-app-home .dhl-home-media img { object-position: 53% 22%; }
+  .dhl-home-shade {
+    background: linear-gradient(180deg, rgba(5, 12, 19, .08) 0%, rgba(5, 12, 19, .17) 29%, rgba(5, 10, 16, .69) 54%, rgba(3, 7, 12, .94) 100%);
+  }
+  .dhl-app-home .dhl-home-copy {
+    justify-content: flex-end;
+    width: 100%;
+    max-width: none;
+    padding: 22px;
+  }
+  .dhl-app-home .dhl-home-greeting { margin-bottom: 12px; padding: 5px 9px; font-size: 15px; }
+  .dhl-app-home .dhl-home-copy .dhl-eyebrow { margin-bottom: 8px; font-size: 10px; letter-spacing: .15em; }
+  .dhl-app-home .dhl-home-copy h1 { margin-bottom: 9px; font-size: clamp(32px, 8.8vw, 39px); line-height: 1.04; }
+  .dhl-app-home .dhl-home-copy p { margin-bottom: 17px; font-size: 14px; line-height: 1.4; }
+  .dhl-app-home .dhl-home-copy .dhl-tracking-form { width: 100%; min-height: 60px; }
+  .dhl-app-home .dhl-home-copy .dhl-tracking-field { height: 52px; min-height: 52px; padding: 0 12px; }
+  .dhl-app-home .dhl-home-copy .dhl-tracking-form .dhl-primary-button { flex-basis: 52px; width: 52px; min-width: 52px; min-height: 52px; height: 52px; }
+
+  .dhl-app-home .dhl-actions { padding: 27px 0 100px; }
+  .dhl-actions-heading { display: block; margin-bottom: 17px; }
+  .dhl-app-home .dhl-actions h2 { font-size: 24px; }
+  .dhl-actions-heading p { margin-top: 4px; font-size: 12px; }
+  .dhl-app-home .dhl-action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .dhl-app-home .dhl-action { min-height: 161px; padding: 16px; border-radius: 18px; }
+  .dhl-app-home .dhl-action-icon { width: 42px; height: 42px; margin-bottom: 4px; }
+  .dhl-app-home .dhl-action strong { font-size: 15px; }
+  .dhl-app-home .dhl-action small { font-size: 12px; }
+  .dhl-action-chevron { right: 14px; bottom: 16px; }
+  .dhl-app-home .dhl-floating-support {
+    right: 18px;
+    bottom: calc(64px + env(safe-area-inset-bottom) + 18px);
+    justify-content: center;
+    width: 56px;
+    height: 56px;
+    padding: 0;
+    border-radius: 50%;
+    box-shadow: 0 7px 22px rgba(112, 4, 12, .27);
+  }
+}
+
+@media (max-width: 400px) {
+  .dhl-app-home .dhl-home-hero .dhl-container { width: calc(100% - 28px); }
+  .dhl-app-home .dhl-home-copy { padding: 19px; }
+  .dhl-app-home .dhl-home-copy h1 { font-size: 33px; }
+  .dhl-app-home .dhl-home-copy p { font-size: 13.5px; }
+}
+
+@media (max-width: 767px) and (max-height: 740px) {
+  .dhl-welcome-cinematic h1 { font-size: clamp(38px, 10vw, 44px); margin-bottom: 10px; }
+  .dhl-welcome-cinematic p { font-size: 14px; }
+  .dhl-welcome-cta { margin-top: 18px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dhl-welcome-cinematic .dhl-welcome-photo img,
+  .dhl-welcome-logo,
+  .dhl-welcome-cinematic .dhl-eyebrow,
+  .dhl-welcome-cinematic h1 span,
+  .dhl-welcome-cinematic p,
+  .dhl-welcome-cta {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+  .dhl-app-home .dhl-action { transition: none; }
+}
