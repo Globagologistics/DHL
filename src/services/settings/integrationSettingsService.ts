@@ -137,6 +137,20 @@ export async function sendTestEmail(): Promise<string> {
   }
 }
 
+export type ManualNotification = { shipmentId: string; recipients: ('sender' | 'receiver')[]; subject: string; message: string };
+
+/** Sends a one-off shipment email through the authenticated server function. */
+export async function sendManualNotification(notification: ManualNotification): Promise<string> {
+  if (environment.settingsDevAdapter) throw new Error('Available after email configuration. The development mock does not send email.');
+  try {
+    const result = await callAdminSettings<{ sent: number; failed: string[] }>('POST', { action: 'send-notification', ...notification });
+    return result.failed.length ? `Sent ${result.sent}; delivery to the ${result.failed.join(' and ')} failed.` : `Notification sent to ${result.sent} recipient${result.sent === 1 ? '' : 's'}.`;
+  } catch (error) {
+    if (error instanceof ServerEndpointUnavailableError) throw new Error('Available after email configuration. The server notification endpoint is not reachable here.');
+    throw error;
+  }
+}
+
 export async function getIntegrationStatus(): Promise<IntegrationStatusItem[]> {
   const database = (async (): Promise<IntegrationStatusItem> => {
     if (!hasBackendConfiguration) return { key: 'database', label: 'Database', state: 'not_configured', detail: 'Public Supabase configuration is not set for this build.' };
