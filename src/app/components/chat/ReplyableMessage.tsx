@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
-import { CornerUpLeft, Headphones } from 'lucide-react';
+import { CornerUpLeft, Headphones, UserRound } from 'lucide-react';
 import type { ChatMessage, ChatRole } from '../../../types/chat';
 import { supportAgentFor } from '../../../config/supportAgents';
 import { QuotedReply, replyLabel } from './ReplyElements';
@@ -32,7 +32,9 @@ export function ReplyableMessage({ message, activeRole, onReply, className = '',
   return <div className={`dhl-replyable-message ${isMine ? 'mine' : ''} ${offset ? 'swiping' : ''} ${className}`} onPointerDown={handleDown} onPointerMove={handleMove} onPointerUp={finish} onPointerCancel={() => { setOffset(0); start.current = null; }}>
     <span className={`dhl-reply-swipe-indicator${Math.abs(offset) >= threshold ? ' ready' : ''}`} aria-hidden="true"><CornerUpLeft size={17} /></span>
     <div className="dhl-replyable-content" style={{ transform: `translateX(${offset}px)` }}>
-      {!isMine && <span className={`dhl-chat-avatar ${avatarClassName}`} aria-label={persona?.name || 'DHL Support'}>{persona ? <img src={persona.avatar} alt="" /> : <Headphones size={15} aria-hidden="true" />}</span>}
+      {!isMine && (message.sender === 'admin'
+        ? <span className={`dhl-chat-avatar ${avatarClassName}`} aria-label={persona?.name || 'DHL Support'}>{persona ? <img src={persona.avatar} alt="" /> : <Headphones size={15} aria-hidden="true" />}</span>
+        : <span className={`dhl-chat-avatar ${avatarClassName}`} aria-label="Customer"><UserRound size={15} aria-hidden="true" /></span>)}
       <div className="dhl-chat-content">
         {!isMine && !compact && <strong className="dhl-chat-sender-name">{persona?.name || message.senderName || 'DHL Shipment Support'}</strong>}
         <div className="dhl-chat-bubble">
