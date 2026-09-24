@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 64" role="img" aria-label="DHL Express redesign concept">
+  <rect width="240" height="64" rx="4" fill="#ffcc00"/>
+  <path d="M17 19h38l-4 7H20zm-5 9h38l-4 7H15zm-4 9h38l-4 7H11zM62 15h22c17 0 25 7 25 17 0 11-10 17-27 17H51zm16 10-7 14h11c8 0 13-3 13-7s-5-7-13-7zM119 15h14l-5 11h18l5-11h14l-16 34h-14l6-12h-18l-6 12h-14zM173 15h14l-11 24h35l-5 10h-49z" fill="#d40511"/>
+  <text x="216" y="47" text-anchor="end" fill="#d40511" font-family="Arial,sans-serif" font-size="7" font-weight="700">EXPRESS</text>
+</svg>

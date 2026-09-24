@@ -17,29 +17,28 @@ export default defineConfig(({ command, mode }) => {
       isProd && VitePWA({
         registerType: 'autoUpdate',
         includeAssets: [
-          'favicon.ico',
-          'apple-touch-icon.png',
-          'buske-logo.jpeg',
+          'dhl-concept-icon.svg',
+          'dhl-concept-logo.svg',
         ],
         manifest: {
-          name: 'Buske Logistics',
-          short_name: 'Buske',
-          description: 'Your Trusted Global Logistics Partner.',
-          theme_color: '#2563EB',
+          name: 'DHL Express redesign concept',
+          short_name: 'DHL Concept',
+          description: 'Shipment tracking redesign concept.',
+          theme_color: '#FFCC00',
           background_color: '#ffffff',
           display: 'standalone',
           start_url: '/',
           icons: [
             {
-              src: '/buske-logo.jpeg',
+              src: '/dhl-concept-icon.svg',
               sizes: '192x192',
-              type: 'image/jpeg',
+              type: 'image/svg+xml',
               purpose: 'any'
             },
             {
-              src: '/buske-logo.jpeg',
+              src: '/dhl-concept-icon.svg',
               sizes: '512x512',
-              type: 'image/jpeg',
+              type: 'image/svg+xml',
               purpose: 'any'
             }
           ]
@@ -70,6 +69,11 @@ export default defineConfig(({ command, mode }) => {
         // Alias @ to the src directory
         '@': path.resolve(__dirname, './src'),
       },
+    },
+    server: {
+      host: '0.0.0.0',
+      port: 5194,
+      strictPort: true,
     },
 
     // File types to support raw imports. Never add .css, .tsx, or .ts files to this.

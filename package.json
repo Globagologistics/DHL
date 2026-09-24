@@ -1,11 +1,12 @@
 {
-  "name": "@figma/my-make-file",
+  "name": "dhl-express-redesign-concept",
   "private": true,
   "version": "0.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "lint": "eslint 'src/**/*.{js,ts,jsx,tsx}' --fix",
     "format": "prettier --write 'src/**/*.{js,ts,jsx,tsx,css,html}'",
@@ -91,6 +92,7 @@
     "prettier": "3.8.1",
     "rimraf": "5.0.0",
     "tailwindcss": "4.1.12",
+    "typescript": "5.9.3",
     "vite": "6.3.5",
     "vite-plugin-pwa": "^1.2.0"
   },

@@ -31,3 +31,17 @@ node_modules/
 
 # Local Netlify folder
 .netlify
+
+# Reference project generated artifacts
+design-reference/**/node_modules/
+design-reference/**/dist/
+design-reference/**/.vite/
+
+# Local reports and private data
+/coverage/
+*.sql.gz
+*.dump
+*.backup
+*.tmp
+*.temp
+assets/images/*-public-archive.jpeg
