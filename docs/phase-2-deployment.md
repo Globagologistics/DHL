@@ -63,8 +63,18 @@ Buckets: `shipment-images`, `driver-images`, `route-screenshots`, `chat-media`.
 
 - Keep buckets public-read only if public image URLs are acceptable. Otherwise switch to signed URLs.
 - **Restrict uploads**: the development policy *Public bucket insert* lets anyone upload. Limit inserts to authenticated admins (and chat participants for `chat-media`), and set size/MIME limits per bucket.
+- **One exception, public request photos:** the public form (`/shipment-request/new`) uploads 1–3 photos as an anonymous visitor into `shipment-images/requests/<uuid>/`. Allow only that folder, and limit the bucket to JPEG/PNG/WebP up to 10 MB:
 
-**Check:** an anonymous upload fails; an admin upload from Create Shipment succeeds.
+  ```sql
+  create policy "Public request photos" on storage.objects for insert to anon, authenticated
+    with check (bucket_id = 'shipment-images' and (storage.foldername(name))[1] = 'requests');
+  update storage.buckets set file_size_limit = 10485760,
+    allowed_mime_types = array['image/jpeg','image/png','image/webp'] where id = 'shipment-images';
+  ```
+
+  The same rate limit or CAPTCHA that protects `submit_shipment_request` should cover these uploads.
+
+**Check:** an anonymous upload outside `requests/` fails; the public form submits with photos; an admin upload from Create Shipment succeeds.
 
 ## 5. Create the initial administrator
 
