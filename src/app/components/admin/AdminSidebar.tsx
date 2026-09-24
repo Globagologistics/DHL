@@ -1,5 +1,5 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { BarChart3, Bell, ChevronDown, CircleHelp, LayoutDashboard, MapPin, MessageCircle, Package, Plus, Settings, Truck, Users, UserRound, X } from 'lucide-react';
+import { BarChart3, Bell, ChevronDown, CircleHelp, LayoutDashboard, MessageCircle, Package, Plus, Settings, Truck, Users, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
 import { brandConfig } from '../../../config/brand';
 import { supabase } from '../../../lib/supabase';
@@ -15,7 +15,6 @@ const navigation = [
   { label: 'Support & Chat', to: '/admin/chat', icon: MessageCircle },
   { label: 'Notifications', to: '/admin/notifications', icon: Bell },
   { label: 'Reports & Analytics', to: '/admin/reports', icon: BarChart3 },
-  { label: 'Service Points', to: '/admin/service-points', icon: MapPin },
   { label: 'Settings', to: '/admin/settings', icon: Settings },
 ];
 
