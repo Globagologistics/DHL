@@ -10,5 +10,6 @@ export const brandConfig = {
   metaDescription: 'A DHL Express redesign concept for tracking shipments and contacting shipment support.',
   logo: '/dhl-concept-logo.svg',
   favicon: '/dhl-concept-icon.svg',
+  campaignImage: '/images/dhl-logistics-campaign.jpeg',
   themeColor: '#FFCC00',
 } as const;
