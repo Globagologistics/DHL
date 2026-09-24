@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import type { Shipment, Checkpoint, ShipmentWithCheckpoints } from '../types/database';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { isMissingTrackingColumn, resolveShipmentReference, withLookupTimeout } from '../services/trackingService';
-import { buildDemoShipment, isDemoShipmentReference } from '../demo/demoShipment';
+import { findDevShipment, subscribeDevData } from '../demo/devDataStore';
 
 // Hook to fetch all shipments for admin
 export function useAdminShipments(adminId: string) {
@@ -81,11 +81,15 @@ export function useShipmentWithCheckpoints(reference: string) {
       setLoading(false);
       return;
     }
-    // Development demo shipment: same data contract, no backend call.
-    if (isDemoShipmentReference(reference)) {
-      setShipment(buildDemoShipment());
+    // Development data store: same data contract, no backend call, live updates.
+    const devShipment = findDevShipment(reference);
+    if (devShipment) {
+      setShipment(devShipment);
       setLoading(false);
-      return;
+      return subscribeDevData(() => {
+        const next = findDevShipment(reference);
+        if (next) setShipment(next); else { setShipment(null); setNotFound(true); }
+      });
     }
     const target = resolveShipmentReference(reference);
     if (!target) {

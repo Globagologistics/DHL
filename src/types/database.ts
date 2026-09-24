@@ -38,11 +38,47 @@ export interface StructuredAddress {
   country?: string;
 }
 
+/** Controlled lifecycle (migration 20260926000000). See src/features/shipments/lifecycle.ts. */
+export type LifecycleState =
+  | 'draft' | 'pending_review' | 'scheduled' | 'awaiting_takeoff' | 'in_transit'
+  | 'paused' | 'stopped' | 'delivered' | 'cancelled' | 'terminated';
+
+/** Customer-visible timeline entry appended by lifecycle actions and admin updates. */
+export interface ShipmentEvent {
+  id: string;
+  kind: 'created' | 'published' | 'started' | 'paused' | 'resumed' | 'stopped' | 'restarted' | 'delivered' | 'cancelled' | 'terminated' | 'update';
+  title: string;
+  detail?: string | null;
+  location?: string | null;
+  /** Present when the update was placed with a gazetteer location; makes the route multi-leg. */
+  lat?: number | null;
+  lng?: number | null;
+  at: string;
+}
+
 export interface Shipment {
   id: string;
-  /** Customer-facing 12-digit number. Absent until migration 20260925000000 is applied. */
+  /** Customer-facing 12-digit number, assigned when the shipment is published. */
   tracking_number?: string | null;
   shipment_details?: ShipmentDetails | null;
+  lifecycle_state?: LifecycleState | null;
+  lifecycle_events?: ShipmentEvent[] | null;
+  package_value?: number | null;
+  outstanding_amount?: number | null;
+  carrier_role?: string | null;
+  started_at?: string | null;
+  origin_lat?: number | null;
+  origin_lng?: number | null;
+  destination_lat?: number | null;
+  destination_lng?: number | null;
+  current_lat?: number | null;
+  current_lng?: number | null;
+  /** Route locations ("Lagos, Nigeria") whose coordinates drive the map; the full address stays in pickup_location / delivery_address. */
+  origin_location_label?: string | null;
+  destination_location_label?: string | null;
+  /** Admin-set position along the route (0–100). Null = derived from the journey timeline. */
+  route_progress?: number | null;
+  deleted_at?: string | null;
   admin_id: string;
   sender_name: string;
   sender_phone: string;

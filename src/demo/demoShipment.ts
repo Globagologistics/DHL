@@ -1,18 +1,15 @@
 import { environment } from '../config/environment';
-import type { Checkpoint, ShipmentWithCheckpoints } from '../types/database';
+import type { Checkpoint, ShipmentEvent, ShipmentWithCheckpoints } from '../types/database';
 
 /**
- * Development-only demo shipment. It lets the full customer and admin journey
- * be inspected before the production backend exists.
+ * Development-only demo shipment, seeded into the development data store
+ * (src/demo/devDataStore.ts) with the same schema as a database row.
  *
  * Active only when BOTH are true:
  *   - a Vite development build (import.meta.env.DEV)
  *   - VITE_ENABLE_DEMO_SHIPMENT=true
- * Setting the flag to false (the default) removes it completely; no UI
- * component references the demo directly.
- *
- * Only DEMO_TRACKING_ID is special. Every other number goes through the
- * normal shipment lookup.
+ * Setting the flag to false (the default) removes the whole development data
+ * layer; no UI component references the demo directly.
  */
 export const DEMO_TRACKING_ID = '010101010101';
 /** UUID-shaped record id so chat and admin routes treat it like a real shipment. */
@@ -21,17 +18,9 @@ export const DEMO_CUSTOMER_NAME = 'Daniel Carter';
 
 export const isDemoShipmentEnabled = () => environment.demoShipment;
 
-/** True for the demo tracking number or its record id, and only while the flag is on. */
-export function isDemoShipmentReference(reference: string | null | undefined): boolean {
-  if (!isDemoShipmentEnabled() || !reference) return false;
-  const value = reference.trim();
-  return value === DEMO_SHIPMENT_RECORD_ID || value.replace(/[\s-]/g, '') === DEMO_TRACKING_ID;
-}
-
-/** Admin list label for the demo record ("Daniel Carter · 0101 0101 0101"), or null. */
-export function demoShipmentLabel(recordId: string | null | undefined): string | null {
-  return recordId === DEMO_SHIPMENT_RECORD_ID && isDemoShipmentEnabled() ? `${DEMO_CUSTOMER_NAME} · ${DEMO_TRACKING_ID.replace(/(\d{4})(?=\d)/g, '$1 ')}` : null;
-}
+/** Coordinates as stored in the bundled GeoNames gazetteer (src/data/gazetteer.json). */
+export const DEMO_ORIGIN = { lat: 40.714, lng: -74.006, label: 'New York City, New York, United States' };
+export const DEMO_DESTINATION = { lat: 34.052, lng: -118.244, label: 'Los Angeles, California, United States' };
 
 const HOUR = 3_600_000;
 
@@ -44,8 +33,8 @@ function tomorrowEvening(now: number) {
 }
 
 /**
- * Builds the demo shipment with the same contract as a database row, with
- * timestamps relative to `now` so the timeline always looks current.
+ * Builds the demo shipment with timestamps relative to `now` so the timeline
+ * looks current when the development data is (re)seeded.
  */
 export function buildDemoShipment(now = Date.now()): ShipmentWithCheckpoints {
   const eta = tomorrowEvening(now);
@@ -53,17 +42,14 @@ export function buildDemoShipment(now = Date.now()): ShipmentWithCheckpoints {
   const total = (eta - now) / 0.4;
   const start = eta - total;
   const iso = (time: number) => new Date(time).toISOString();
-  const createdAt = iso(now - 30 * HOUR);
+  const createdAt = iso(now - 31 * HOUR);
+  const publishedAt = iso(now - 30 * HOUR);
 
   const stops: [string, Checkpoint['status'], number][] = [
-    ['New York, NY · Shipment information received', 'completed', now - 30 * HOUR],
-    ['New York, NY · Picked up', 'completed', now - 28 * HOUR],
     ['New York, NY · Processed at origin facility', 'completed', now - 25 * HOUR],
-    ['New York, NY · Departed origin facility', 'completed', now - 22 * HOUR],
-    ['Louisville, KY · Arrived at transit facility', 'completed', now - 14 * HOUR],
+    ['Louisville, KY · Arrived at transit hub', 'completed', now - 14 * HOUR],
     ['Los Angeles, CA · Processed at destination facility', 'current', now - 3 * HOUR],
     ['Los Angeles, CA · Out for delivery', 'pending', eta - 8 * HOUR],
-    ['Los Angeles, CA · Delivered', 'pending', eta],
   ];
   const checkpoints: Checkpoint[] = stops.map(([location, status, time], index) => ({
     id: `demo-checkpoint-${index + 1}`,
@@ -74,30 +60,47 @@ export function buildDemoShipment(now = Date.now()): ShipmentWithCheckpoints {
     created_at: iso(time),
     updated_at: iso(time),
   }));
+  const events: ShipmentEvent[] = [
+    { id: 'demo-event-created', kind: 'created', title: 'Shipment created', at: createdAt },
+    { id: 'demo-event-published', kind: 'published', title: 'Shipment information received', at: publishedAt, location: 'New York, NY' },
+    { id: 'demo-event-started', kind: 'started', title: 'Shipment departed origin airport', at: iso(start), location: 'New York, NY' },
+  ];
 
   return {
     id: DEMO_SHIPMENT_RECORD_ID,
     tracking_number: DEMO_TRACKING_ID,
-    admin_id: 'demo-admin',
+    lifecycle_state: 'in_transit',
+    lifecycle_events: events,
+    admin_id: 'dev-admin',
     sender_name: 'Olivia Reed',
     sender_phone: '+1 212 555 0132',
-    sender_email: 'olivia.reed@example.com',
+    sender_email: '',
     receiver_name: DEMO_CUSTOMER_NAME,
     receiver_phone: '+1 213 555 0148',
     receiver_email: 'daniel.carter@example.com',
-    pickup_location: 'New York, NY, United States',
-    delivery_address: 'Los Angeles, CA, United States',
+    pickup_location: '450 Park Avenue South, New York, NY, United States',
+    delivery_address: '1200 Wilshire Blvd, Los Angeles, CA, United States',
     warehouse: '',
-    transportation: 'DHL Express Worldwide',
+    transportation: 'Air Freight',
+    carrier_role: 'Pilot',
+    driver_name: 'Capt. Marcus Hale',
     package_name: 'Personal package',
-    images: ['/images/dhl-logistics-campaign.jpeg'],
-    cost: 86.4,
+    // Existing bundled images stand in for package photos in development.
+    images: ['/images/dhl-logistics-campaign.jpeg', '/images/dhl-cinematic-portrait.webp', '/images/dhl-cinematic-landscape.webp'],
+    package_value: 1200,
+    cost: 0,
     currency: 'USD',
     paid: true,
     payment_status: 'paid',
     payment_responsibility: 'sender',
-    vehicles_count: 1,
-    vehicle_type: 'Boeing 777F',
+    origin_lat: DEMO_ORIGIN.lat,
+    origin_lng: DEMO_ORIGIN.lng,
+    destination_lat: DEMO_DESTINATION.lat,
+    destination_lng: DEMO_DESTINATION.lng,
+    origin_location_label: DEMO_ORIGIN.label,
+    destination_location_label: DEMO_DESTINATION.label,
+    route_progress: null,
+    started_at: iso(start),
     countdown_start_time: iso(start),
     countdown_duration: Math.round(total / 1000),
     estimated_delivery_at: iso(eta),
@@ -105,18 +108,9 @@ export function buildDemoShipment(now = Date.now()): ShipmentWithCheckpoints {
     stopped: false,
     terminated: false,
     is_published: true,
-    published_at: createdAt,
+    published_at: publishedAt,
     status: 'in_transit',
-    current_checkpoint_index: 5,
-    shipment_details: {
-      shipmentType: 'parcel',
-      pieces: 1,
-      weightKg: 2.5,
-      dimensionsCm: { length: 30, width: 22, height: 15 },
-      reference: 'DEMO-010101',
-      sender: { address: '450 Park Avenue South', city: 'New York', state: 'NY', postalCode: '10016', country: 'United States' },
-      recipient: { address: '1200 Wilshire Blvd', city: 'Los Angeles', state: 'CA', postalCode: '90017', country: 'United States' },
-    },
+    current_checkpoint_index: 2,
     checkpoints,
     created_at: createdAt,
     updated_at: iso(now - 3 * HOUR),

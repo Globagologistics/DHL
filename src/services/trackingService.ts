@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase';
-import { DEMO_SHIPMENT_RECORD_ID, DEMO_TRACKING_ID, isDemoShipmentReference } from '../demo/demoShipment';
+import { findDevShipment } from '../demo/devDataStore';
 
 /** Customer tracking numbers are exactly 12 numeric digits. */
 export const TRACKING_NUMBER_LENGTH = 12;
@@ -63,8 +63,9 @@ export function withLookupTimeout<T>(request: PromiseLike<T>): Promise<T> {
  * errors are 'error', so a technical problem is never shown as a wrong number.
  */
 export async function lookupShipmentReference(reference: string): Promise<TrackingLookupResult> {
-  // Development demo shipment (only when VITE_ENABLE_DEMO_SHIPMENT is on).
-  if (isDemoShipmentReference(reference)) return { status: 'found', shipmentId: DEMO_SHIPMENT_RECORD_ID, trackingNumber: DEMO_TRACKING_ID };
+  // Development data store (only when VITE_ENABLE_DEMO_SHIPMENT is on in a dev build).
+  const devShipment = findDevShipment(reference);
+  if (devShipment) return { status: 'found', shipmentId: devShipment.id, trackingNumber: devShipment.tracking_number ?? null };
   const target = resolveShipmentReference(reference);
   if (!target) return { status: 'not_found' };
   try {

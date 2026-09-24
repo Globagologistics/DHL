@@ -1,7 +1,9 @@
 import React, { createContext, useState, ReactNode, useCallback, useEffect } from 'react';
 import * as shipmentService from '../../services/shipmentService';
 import { supabase } from '../../lib/supabase';
-import type { Shipment as DBShipment, Checkpoint as DBCheckpoint, ShipmentDetails, ShipmentWithCheckpoints } from '../../types/database';
+import type { Shipment as DBShipment, Checkpoint as DBCheckpoint, LifecycleState, ShipmentDetails, ShipmentWithCheckpoints } from '../../types/database';
+import { deriveLifecycleState } from '../../features/shipments/lifecycle';
+import { listDevShipments, subscribeDevData } from '../../demo/devDataStore';
 
 export interface Checkpoint extends DBCheckpoint {
   id: string;
@@ -54,6 +56,8 @@ export interface Shipment {
   routeScreenshot?: File | FileList;
   admin_id?: string;
   status?: string;
+  lifecycleState?: LifecycleState;
+  deletedAt?: string | null;
 }
 
 interface AdminContextType {
@@ -68,6 +72,25 @@ interface AdminContextType {
   loading: boolean;
   error: string | null;
   clearError: () => void;
+}
+
+/** Maps a database row to the admin list shape (used for development-store rows). */
+function toAdminShipment(ship: ShipmentWithCheckpoints): Shipment {
+  return {
+    id: ship.id, trackingNumber: ship.tracking_number || null, details: ship.shipment_details || null,
+    createdAt: ship.created_at, updatedAt: ship.updated_at, estimatedDeliveryAt: ship.estimated_delivery_at,
+    senderName: ship.sender_name, senderPhone: ship.sender_phone, senderEmail: ship.sender_email,
+    receiverName: ship.receiver_name, receiverPhone: ship.receiver_phone, receiverEmail: ship.receiver_email || '',
+    pickupLocation: ship.pickup_location, deliveryAddress: ship.delivery_address, warehouse: ship.warehouse || '',
+    transportation: ship.transportation, packageName: ship.package_name || '', images: ship.images || [],
+    cost: ship.cost, paid: ship.paid, currency: ship.currency, paymentStatus: ship.payment_status, paymentResponsibility: ship.payment_responsibility,
+    vehiclesCount: ship.vehicles_count, vehicleType: ship.vehicle_type, driverName: ship.driver_name, driverExperience: ship.driver_experience,
+    stopped: ship.stopped, stopReason: ship.stop_reason, stopTimestamp: ship.stop_timestamp, paused: ship.paused,
+    countdownDuration: ship.countdown_duration ? ship.countdown_duration / 3600 : 0, countdownStartTime: ship.countdown_start_time, pauseTimestamp: ship.pause_timestamp,
+    terminated: ship.terminated, terminateTimestamp: ship.terminate_timestamp, admin_id: ship.admin_id, status: ship.status,
+    lifecycleState: deriveLifecycleState(ship), deletedAt: ship.deleted_at || null,
+    checkpoints: (ship.checkpoints || []) as Checkpoint[], currentCheckpointIndex: ship.current_checkpoint_index || 0,
+  };
 }
 
 export const AdminContext = createContext<AdminContextType>({
@@ -220,6 +243,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             terminateTimestamp: ship.terminate_timestamp,
             admin_id: ship.admin_id,
             status: ship.status,
+            lifecycleState: deriveLifecycleState(ship),
+            deletedAt: ship.deleted_at || null,
             checkpoints: (ship.checkpoints || []) as Checkpoint[],
             currentCheckpointIndex: ship.current_checkpoint_index || 0,
           };
@@ -425,6 +450,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             pauseTimestamp: ship.pause_timestamp,
             admin_id: ship.admin_id,
             status: ship.status,
+            lifecycleState: deriveLifecycleState(ship),
+            deletedAt: ship.deleted_at || null,
             checkpoints: (ship.checkpoints || []) as Checkpoint[],
             currentCheckpointIndex: ship.current_checkpoint_index || 0,
           }));
@@ -535,6 +562,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             pauseTimestamp: ship.pause_timestamp,
             admin_id: ship.admin_id,
             status: ship.status,
+            lifecycleState: deriveLifecycleState(ship),
+            deletedAt: ship.deleted_at || null,
             checkpoints: (ship.checkpoints || []) as Checkpoint[],
             currentCheckpointIndex: ship.current_checkpoint_index || 0,
           }));
@@ -603,6 +632,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             pauseTimestamp: ship.pause_timestamp,
             admin_id: ship.admin_id,
             status: ship.status,
+            lifecycleState: deriveLifecycleState(ship),
+            deletedAt: ship.deleted_at || null,
             checkpoints: (ship.checkpoints || []) as Checkpoint[],
             currentCheckpointIndex: ship.current_checkpoint_index || 0,
           }));
@@ -697,6 +728,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             pauseTimestamp: ship.pause_timestamp,
             admin_id: ship.admin_id,
             status: ship.status,
+            lifecycleState: deriveLifecycleState(ship),
+            deletedAt: ship.deleted_at || null,
             checkpoints: (ship.checkpoints || []) as Checkpoint[],
             currentCheckpointIndex: ship.current_checkpoint_index || 0,
           }));
@@ -759,6 +792,8 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
             pauseTimestamp: ship.pause_timestamp,
             admin_id: ship.admin_id,
             status: ship.status,
+            lifecycleState: deriveLifecycleState(ship),
+            deletedAt: ship.deleted_at || null,
             checkpoints: (ship.checkpoints || []) as Checkpoint[],
             currentCheckpointIndex: ship.current_checkpoint_index || 0,
           }));
@@ -774,6 +809,12 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
     [adminId]
   );
 
+  // Development data store records (demo shipment and shipments created during
+  // the dev bypass) join the list; hidden rows (soft-deleted) are excluded.
+  const [devShipments, setDevShipments] = useState<Shipment[]>(() => listDevShipments().map(toAdminShipment));
+  useEffect(() => subscribeDevData(() => setDevShipments(listDevShipments().map(toAdminShipment))), []);
+  const allShipments = React.useMemo(() => [...devShipments, ...shipments.filter(item => !item.deletedAt)], [devShipments, shipments]);
+
   const clearError = useCallback(() => {
     setError(null);
   }, []);
@@ -781,7 +822,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AdminContext.Provider
       value={{
-        shipments,
+        shipments: allShipments,
         addShipment,
         updateShipment,
         deleteShipment,

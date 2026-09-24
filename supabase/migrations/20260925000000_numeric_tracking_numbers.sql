@@ -1,4 +1,6 @@
--- Customer-facing tracking numbers: exactly 12 numeric digits.
+-- Customer-facing tracking numbers: exactly 12 numeric digits, assigned when a
+-- shipment is PUBLISHED (see publish_shipment in 20260926000000). Unpublished
+-- (scheduled) shipments have no tracking number.
 -- shipments.id stays the UUID primary key used by checkpoints, chat, storage
 -- paths and notifications; tracking_number is the reference customers type.
 -- Updating only tracking_number does not change status or payment fields, so
@@ -27,36 +29,34 @@ BEGIN
 END;
 $$;
 
-REVOKE ALL ON FUNCTION public.generate_tracking_number() FROM PUBLIC, anon;
-GRANT EXECUTE ON FUNCTION public.generate_tracking_number() TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.generate_tracking_number() FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.generate_tracking_number() TO service_role;
 
--- One UPDATE per row so each uniqueness check sees the previous assignments.
+-- Existing published shipments get a number now; one UPDATE per row so each
+-- uniqueness check sees the previous assignments.
 DO $$
 DECLARE
   v_row record;
 BEGIN
-  FOR v_row IN SELECT id FROM public.shipments WHERE tracking_number IS NULL LOOP
+  FOR v_row IN SELECT id FROM public.shipments WHERE tracking_number IS NULL AND is_published LOOP
     UPDATE public.shipments SET tracking_number = public.generate_tracking_number() WHERE id = v_row.id;
   END LOOP;
 END;
 $$;
 
-ALTER TABLE public.shipments ALTER COLUMN tracking_number SET DEFAULT public.generate_tracking_number();
-ALTER TABLE public.shipments ALTER COLUMN tracking_number SET NOT NULL;
-
 ALTER TABLE public.shipments DROP CONSTRAINT IF EXISTS shipments_tracking_number_format;
-ALTER TABLE public.shipments ADD CONSTRAINT shipments_tracking_number_format CHECK (tracking_number ~ '^[0-9]{12}$');
+ALTER TABLE public.shipments ADD CONSTRAINT shipments_tracking_number_format CHECK (tracking_number IS NULL OR tracking_number ~ '^[0-9]{12}$');
 
-CREATE UNIQUE INDEX IF NOT EXISTS shipments_tracking_number_key ON public.shipments(tracking_number);
+CREATE UNIQUE INDEX IF NOT EXISTS shipments_tracking_number_key ON public.shipments(tracking_number) WHERE tracking_number IS NOT NULL;
 
--- Tracking numbers are assigned by the database, never edited from the browser.
+-- Once assigned, a tracking number never changes (it may only go from NULL to a value).
 CREATE OR REPLACE FUNCTION public.keep_tracking_number_immutable()
 RETURNS trigger
 LANGUAGE plpgsql
 SET search_path = ''
 AS $$
 BEGIN
-  IF NEW.tracking_number IS DISTINCT FROM OLD.tracking_number THEN
+  IF OLD.tracking_number IS NOT NULL AND NEW.tracking_number IS DISTINCT FROM OLD.tracking_number THEN
     NEW.tracking_number := OLD.tracking_number;
   END IF;
   RETURN NEW;
