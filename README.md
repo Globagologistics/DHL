@@ -1,78 +1,34 @@
+# DHL Express redesign concept
 
-  # Buske Logistics Website
+This independent local repository adapts an existing logistics application to the DHL Express visual concept in `design-reference/dhl-redesign/`. The existing Supabase shipment, chat, storage, admin, and notification code remains the functional source of truth. The design reference contains visual prototype state and is not used as a data source.
 
-This repository contains the front‑end of the Buske Logistics site designed using Figma and built with React, Vite and Tailwind CSS. The goal is a production‑ready, responsive, SEO‑optimized, accessible, and deployable static site.
+## Development
 
-## Features
-* Full fidelity Figma design reproduced with React components
-* Mobile‑first responsive layout
-* Tailwind CSS utility classes with custom animations
-* Routing using `react-router` (v7)
-* Netlify-ready build configuration
-* ESLint/Prettier configuration for consistent code style
-* GitHub Actions CI workflow for linting and building
+Use Node 20 (`.nvmrc` / `.node-version`) and npm. Install from the existing lockfile:
 
-## Getting started
-
-```bash
+```sh
 npm ci
 npm run dev
 ```
 
-### Environment variables
-Copy `.env.example` to `.env` or set your own values for API endpoints etc. Vite variables must be prefixed with `VITE_`.
+The development server uses `http://localhost:5194` with a strict port. A port conflict is an error. Run `npm run typecheck` and `npm run build` to validate. `npm run lint` currently changes files automatically, so do not use it as a read-only check.
 
-### Building for production
-```bash
-npm run build
-``` 
+Copy `.env.example` to a local ignored environment file and provide browser-safe Supabase URL and public key values. The existing `.env.local` currently connects to the duplicated application's development backend. `VITE_` values are exposed to the browser; SMTP, Supabase secret/service-role keys, and notification secrets belong only in Netlify server configuration.
 
-### Linting & formatting
-```bash
-npm run lint
-npm run format
-```
+## Customer routes
 
-### Deploying
-This project is configured to deploy to Netlify. Build the project, then deploy the `dist` folder (or connect the repo in Netlify and let it build).
+- `/` welcome; `/home` dashboard; `/track` search
+- `/track/:id` live result; `/track/:id/timeline` recorded checkpoint timeline
+- `/chat` authenticated shipment support; `/settings`; `/send-shipment`; `/locations`
+- `/signin` existing Supabase password authentication
 
-```bash
-npm run build
-```
+Admin routes remain under `/admin` with their existing role checks and workflows.
 
-  This is a code bundle for the Buske Logistics website. The original project is available at https://www.figma.com/design/H0QZC7IttP9eKJYvPdYEbO/Redesign-Buske-Logistics-Website if you need the Figma source.
+## Current limitations
 
-  ## Running the code
-
-  Run `npm i` to install the dependencies.
-
-  Run `npm run dev` to start the development server.
-  
----
-
-## Admin Dashboard
-A hidden admin control centre is built into the application:
-
-1. **Access** – a secret login system is built in:
-   * click the copyright text in the footer **five times**, or
-   * repeatedly click the logo in the navbar.  Both actions unlock the admin mode and redirect
-     to `/admin`.
-2. **Routing** – once unlocked you can browse the admin area:
-   * `/admin` – dashboard with a library of all shipments (most recent first)
-   * `/admin/new` – full‑page form to create a new shipment
-   * `/admin/edit/:id` – same form pre‑filled for editing an existing record
-   * `/admin/view/:id` – detail page showing shipment data, interactive progress,
-     pause/resume and stop controls (with reason/email prompt)
-3. **Features** –
-   * Create, edit, and delete shipments using a dedicated page.
-   * Each shipment is assigned a unique ID and can store sender/receiver info, images, route screenshot, dates, cost, payment status, transportation method, vehicles/driver details and a list of checkpoints.
-   * Uploaded media are previewed via object URLs.
-   * Dashboard list includes a progress bar and status badges for paused/stopped shipments.
-   * Clicking a shipment from the list navigates to the detail view where an admin can:
-     - advance the current checkpoint by clicking on the progress bar
-     - pause or resume tracking
-     - stop the shipment with a reason (this will open the user's email client to notify the receiver)
-   * Newly created shipments appear at the top of the dashboard list ("Recent / Current Track").
-   * All data is held in memory; refreshing clears everything.
-
-_Data is currently stored in-memory; refresh clears all shipments. Add a backend for persistence in production._
+- The waybill preview is generated from shipment fields because the current schema contains no carrier-issued waybill file or document metadata. It is clearly labelled as a record preview.
+- Checkpoint timestamps reflect when records were created, not independently verified physical scan times.
+- Route visualization uses the existing screenshot when present; otherwise it is illustrative and does not claim live coordinates.
+- Service point data is not connected. The Send Shipment route intentionally shows a temporary loading and service error flow.
+- Backend separation, new Supabase credentials, SMTP configuration, and final notification deployment are a later phase. No customer records were migrated.
+- This is a redesign concept and should not be represented as an official production DHL service.

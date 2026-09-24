@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import { Check, ChevronRight, Copy, FileText, Image as ImageIcon, Map, Package, Truck, X } from 'lucide-react';
 import { PageHeading, ShipmentProgress, StatusBadge } from '../components/customer/CustomerShell';
 import { useShipmentWithCheckpoints } from '../../hooks/useSupabase';
@@ -84,15 +84,14 @@ export default function TrackShipment() {
   const { id = '' } = useParams();
   const [params] = useSearchParams();
   const location = useLocation();
-  const navigate = useNavigate();
   const { shipment, loading, error } = useShipmentWithCheckpoints(id);
-  const [tick, setTick] = useState(0);
+  const [now, setNow] = useState(() => Date.now());
   const [detail, setDetail] = useState<Detail>(null);
-  useEffect(() => { const timer = window.setInterval(() => setTick(value => value + 1), 30000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => { const timer = window.setInterval(() => setNow(Date.now()), 30000); return () => window.clearInterval(timer); }, []);
   useEffect(() => { const view = params.get('view'); setDetail(view === 'package' || view === 'waybill' || view === 'map' ? view : null); }, [params]);
   const openDetail = (next: Detail) => setDetail(next);
   const images = useMemo(() => (shipment?.images || []).filter(Boolean).map(imageUrl), [shipment?.images]);
-  const journey = shipment ? getShipmentJourneyState(shipment, Date.now() + tick * 0) : null;
+  const journey = shipment ? getShipmentJourneyState(shipment, now) : null;
   const status = journey ? formatJourneyStatus(journey.status) : '';
   if (!id) return <div className="dhl-narrow dhl-search-page"><PageHeading title="Tracking number required" backTo="/track"/><p className="dhl-muted">Enter a tracking number to view shipment progress.</p></div>;
   if (loading) return <div className="dhl-narrow dhl-search-page"><PageHeading title="Finding shipment" backTo="/track"/><p className="dhl-muted">Checking the latest shipment record…</p></div>;
