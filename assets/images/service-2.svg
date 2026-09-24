@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="100%" height="100%" fill="#f8fafc" />
+  <g transform="translate(60,120)">
+    <rect x="0" y="160" width="680" height="120" rx="16" fill="#e6eefc" />
+    <rect x="60" y="40" width="560" height="140" rx="6" fill="#f1f5f9" />
+    <rect x="80" y="60" width="520" height="100" rx="4" fill="#60a5fa" />
+    <rect x="140" y="220" width="80" height="40" rx="8" fill="#0f172a" />
+    <rect x="460" y="220" width="80" height="40" rx="8" fill="#0f172a" />
+  </g>
+  <text x="50%" y="94%" font-family="Inter, system-ui, sans-serif" font-size="28" fill="#0f172a" text-anchor="middle">Container Shipment</text>
+</svg>

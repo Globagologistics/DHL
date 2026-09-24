@@ -1,0 +1,120 @@
+.shipment-journey {
+  --journey-progress: 0%;
+  position: relative;
+  overflow: hidden;
+  min-height: 196px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 1rem;
+  isolation: isolate;
+}
+
+.shipment-journey__scene,
+.shipment-journey__atmosphere,
+.shipment-journey__route,
+.shipment-journey__markers {
+  position: absolute;
+  inset: 0;
+}
+
+.shipment-journey__scene { background: linear-gradient(145deg, #233750 0%, #142033 100%); }
+.shipment-journey--air .shipment-journey__scene { background: linear-gradient(160deg, #1268b3 0%, #57b6eb 52%, #c7ecfb 100%); }
+.shipment-journey--sea .shipment-journey__scene { background: linear-gradient(160deg, #0a385f 0%, #087a9d 49%, #0e4c6f 50%); }
+
+.shipment-journey__road {
+  position: absolute;
+  right: 0;
+  bottom: 16px;
+  left: 0;
+  height: 112px;
+  border-top: 2px solid rgba(255,255,255,.08);
+  border-bottom: 2px solid rgba(0,0,0,.42);
+  background: linear-gradient(180deg, #1a2132, #121827);
+}
+
+.shipment-journey__road::after {
+  position: absolute;
+  top: 53px;
+  right: 0;
+  left: 0;
+  height: 4px;
+  content: "";
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,.96) 0 13px, transparent 13px 34px);
+  background-size: 34px 4px;
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.28));
+}
+
+.shipment-journey[data-moving="true"] .shipment-journey__road::after { animation: journey-road .78s linear infinite; }
+
+.shipment-journey__cloud {
+  position: absolute;
+  width: 92px;
+  height: 22px;
+  border-radius: 40px;
+  background: rgba(255,255,255,.52);
+  filter: blur(.2px);
+}
+.shipment-journey__cloud::before,
+.shipment-journey__cloud::after { position: absolute; bottom: 7px; border-radius: 50%; background: inherit; content: ""; }
+.shipment-journey__cloud::before { left: 17px; width: 29px; height: 29px; }
+.shipment-journey__cloud::after { right: 15px; width: 35px; height: 35px; }
+.shipment-journey__cloud--one { top: 32px; left: 9%; opacity: .62; }
+.shipment-journey__cloud--two { top: 65px; left: 61%; transform: scale(.68); opacity: .48; }
+.shipment-journey[data-moving="true"] .shipment-journey__cloud { animation: journey-cloud 10s linear infinite; }
+
+.shipment-journey__water {
+  position: absolute;
+  right: -4%;
+  bottom: 0;
+  left: -4%;
+  height: 52%;
+  background: repeating-linear-gradient(0deg, rgba(139,239,255,.22) 0 2px, transparent 2px 15px), linear-gradient(120deg, #087da1, #065a85);
+}
+.shipment-journey__water::after { position: absolute; inset: 0; content: ""; background: repeating-linear-gradient(90deg, transparent 0 24px, rgba(199,251,255,.4) 24px 52px, transparent 52px 88px); opacity: .6; }
+.shipment-journey[data-moving="true"] .shipment-journey__water::after { animation: journey-water 2.2s linear infinite; }
+
+.shipment-journey__route { top: auto; right: 50px; bottom: 65px; left: 50px; height: 3px; border-radius: 999px; background: rgba(255,255,255,.32); }
+.shipment-journey__route-progress { width: var(--journey-progress); height: inherit; border-radius: inherit; background: linear-gradient(90deg, #48e4b7, #67c7ff); box-shadow: 0 0 18px rgba(86,207,255,.65); transition: width 900ms linear; }
+
+.shipment-journey__marker { position: absolute; bottom: 54px; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 5px; width: min(31%, 165px); color: rgba(255,255,255,.92); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.shipment-journey__marker--origin { left: 4px; }
+.shipment-journey__marker--destination { right: 4px; }
+.shipment-journey__marker-pin { width: 13px; height: 13px; border: 3px solid rgba(255,255,255,.85); border-radius: 50%; background: #48e4b7; box-shadow: 0 0 0 4px rgba(72,228,183,.2); }
+.shipment-journey__marker--destination .shipment-journey__marker-pin { background: #f7c75f; box-shadow: 0 0 0 4px rgba(247,199,95,.2); }
+.shipment-journey__marker-label { overflow: hidden; max-width: 100%; text-overflow: ellipsis; white-space: nowrap; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+
+.shipment-journey__vehicle-track { position: absolute; right: 50px; bottom: 43px; left: 50px; z-index: 4; height: 64px; }
+.shipment-journey__vehicle { position: absolute; bottom: 0; left: var(--journey-progress); width: 100px; height: 64px; transform: translateX(-50%); transition: left 900ms linear, opacity 250ms ease; }
+.shipment-journey[data-moving="true"] .shipment-journey__vehicle { animation: journey-suspension 1.15s ease-in-out infinite; }
+.shipment-journey__vehicle svg { display: block; width: 100%; height: 100%; overflow: visible; filter: drop-shadow(0 9px 5px rgba(0,0,0,.35)); }
+.shipment-journey__wheel { transform-box: fill-box; transform-origin: center; }
+.shipment-journey[data-moving="true"] .shipment-journey__wheel { animation: journey-wheel .62s linear infinite; }
+.shipment-journey__vehicle--air { bottom: 64px; width: 96px; }
+.shipment-journey__vehicle--sea { bottom: 49px; width: 106px; }
+.shipment-journey__vehicle--stopped { opacity: .78; filter: saturate(.76); }
+
+.shipment-journey__status { position: absolute; top: 15px; left: 16px; z-index: 5; display: inline-flex; align-items: center; gap: 7px; border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 6px 10px; background: rgba(8,19,35,.45); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; backdrop-filter: blur(8px); }
+.shipment-journey__status-dot { width: 7px; height: 7px; border-radius: 999px; background: #71e7bf; box-shadow: 0 0 9px #71e7bf; }
+.shipment-journey[data-moving="false"] .shipment-journey__status-dot { background: #f5c569; box-shadow: none; }
+.shipment-journey__completion { position: absolute; top: 16px; right: 16px; z-index: 5; color: #d8ffe8; font-size: 12px; font-weight: 700; }
+
+@keyframes journey-road { to { background-position-x: -34px; } }
+@keyframes journey-wheel { to { transform: rotate(360deg); } }
+@keyframes journey-suspension { 0%, 100% { margin-top: 0; } 50% { margin-top: -2px; } }
+@keyframes journey-cloud { to { transform: translateX(-130px); } }
+@keyframes journey-water { to { background-position-x: -88px; } }
+
+@media (max-width: 480px) {
+  .shipment-journey { min-height: 180px; }
+  .shipment-journey__vehicle-track { right: 42px; bottom: 40px; left: 42px; }
+  .shipment-journey__vehicle { width: 84px; }
+  .shipment-journey__vehicle--air { bottom: 22px; }
+  .shipment-journey__vehicle--sea { bottom: 8px; width: 92px; }
+  .shipment-journey__route { right: 42px; bottom: 59px; left: 42px; }
+  .shipment-journey__marker { bottom: 48px; font-size: 9px; }
+  .shipment-journey__road { bottom: 14px; height: 96px; }
+  .shipment-journey__road::after { top: 45px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shipment-journey *, .shipment-journey *::before, .shipment-journey *::after { animation: none !important; transition-duration: 0s !important; }
+}

@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <rect width="100%" height="100%" fill="#f8fafc" />
+  <g transform="translate(40,120)">
+    <path d="M60 260 L720 200 L680 180 L140 220 Z" fill="#bfdbfe" />
+    <path d="M140 220 L700 180 L740 160 L180 200 Z" fill="#60a5fa" />
+    <circle cx="220" cy="320" r="18" fill="#0f172a" />
+    <circle cx="560" cy="300" r="18" fill="#0f172a" />
+  </g>
+  <text x="50%" y="94%" font-family="Inter, system-ui, sans-serif" font-size="28" fill="#0f172a" text-anchor="middle">Air & Express</text>
+</svg>
