@@ -1,7 +1,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
-  /* Buske Logistics Premium Color System */
+  /* Legacy UI tokens retained for the existing admin screens. */
   --navy-deep: #0F1F3D;
   --navy-royal: #1A365D;
   --blue-accent: #2563EB;

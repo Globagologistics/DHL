@@ -1,132 +1,70 @@
-import React, { useEffect, useState } from "react";
-import { ChatThread } from "../components/chat/ChatThread";
-import { ensureChatThread } from "../../hooks/useChat";
-import { supabase } from "../../lib/supabase";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { ChevronLeft, ChevronRight, Headphones, Paperclip, Send, ShieldCheck, Truck } from 'lucide-react';
+import { BrandLogo, PageHeading, StatusBadge } from '../components/customer/CustomerShell';
+import { ensureChatThread, markThreadRead, sendChatMessage, useChatMessages } from '../../hooks/useChat';
+import { useShipmentWithCheckpoints } from '../../hooks/useSupabase';
+import { supabase } from '../../lib/supabase';
+import { formatJourneyStatus, getShipmentJourneyState } from '../utils/shipmentJourney';
+import { brandConfig } from '../../config/brand';
+
+type ActiveThread = { id: string; trackingId: string };
+
+function CustomerConversation({ thread, onBack }: { thread: ActiveThread; onBack: () => void }) {
+  const { messages, loading } = useChatMessages(thread.trackingId, thread.id);
+  const { shipment } = useShipmentWithCheckpoints(thread.trackingId);
+  const [draft, setDraft] = useState('');
+  const [file, setFile] = useState<File | null>(null);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState('');
+  const fileInput = useRef<HTMLInputElement>(null);
+  const bottom = useRef<HTMLDivElement>(null);
+  useEffect(() => { void markThreadRead(thread.id, 'user'); }, [thread.id, messages.length]);
+  useEffect(() => { bottom.current?.scrollIntoView({ block: 'end' }); }, [messages.length]);
+  const send = async () => {
+    if ((!draft.trim() && !file) || sending) return;
+    setSending(true); setError('');
+    const result = await sendChatMessage({ trackingId: thread.trackingId, threadId: thread.id, sender: 'user', text: draft, mediaFiles: file ? [file] : [] });
+    if (result.error) setError(result.error);
+    else { setDraft(''); setFile(null); if (fileInput.current) fileInput.current.value = ''; }
+    setSending(false);
+  };
+  const status = shipment ? formatJourneyStatus(getShipmentJourneyState(shipment).status) : 'Shipment';
+  const latest = [...(shipment?.checkpoints || [])].sort((a,b) => b.checkpoint_order - a.checkpoint_order)[0];
+  return <div className="dhl-chat-shell"><section className="dhl-conversation" aria-label="Shipment support conversation"><header className="dhl-chat-header"><button className="dhl-icon-button" onClick={onBack} aria-label="Back to support"><ChevronLeft size={21}/></button><BrandLogo/><div><strong>{brandConfig.supportName}</strong><small>Secure shipment conversation</small></div></header><div className="dhl-chat-ref">Tracking ID: <strong>{thread.trackingId}</strong>{shipment && <span style={{ marginLeft: 10 }}><StatusBadge status={status}/></span>}</div>
+    <div className="dhl-chat-embedded-card"><span className="dhl-eyebrow">Shipment at a glance</span><strong>{thread.trackingId}</strong><div><StatusBadge status={status}/><span>{latest?.location || shipment?.delivery_address || 'Shipment details loading'}</span></div><Link to={`/track/${encodeURIComponent(thread.trackingId)}`}>View tracking <ChevronRight size={15}/></Link></div>
+    <div className="dhl-chat-messages" role="log" aria-live="polite">{loading && <p className="dhl-muted">Loading messages…</p>}{!loading && messages.length === 0 && <p className="dhl-muted">Your conversation is ready. Send a message to shipment support.</p>}{messages.map(message => <div key={message.id} className={`dhl-chat-message ${message.sender === 'user' ? 'mine' : ''}`}>{message.sender !== 'user' && <span className="dhl-chat-avatar">{brandConfig.shortName}</span>}<div className="dhl-chat-content"><div className="dhl-chat-bubble">{message.text}{message.media?.map(media => media.type === 'video' ? <video className="dhl-chat-attachment" controls src={media.url} key={media.id}/> : <a href={media.url} target="_blank" rel="noreferrer" key={media.id}><img className="dhl-chat-attachment" src={media.url} alt={media.name || 'Chat attachment'}/></a>)}</div><small>{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small></div></div>)}<div ref={bottom}/></div>
+    {file && <div style={{ padding: '8px 20px', background: 'white', fontSize: 12 }}>Attachment: {file.name} <button className="dhl-text-button" onClick={() => setFile(null)}>Remove</button></div>}{error && <p className="dhl-error-text" style={{ padding: '0 20px' }}>{error}</p>}
+    <form className="dhl-chat-composer" onSubmit={event => { event.preventDefault(); void send(); }}><input ref={fileInput} type="file" accept="image/*,video/*" hidden onChange={event => setFile(event.target.files?.[0] || null)}/><button type="button" onClick={() => fileInput.current?.click()} aria-label="Attach image or video"><Paperclip size={21}/></button><textarea value={draft} onChange={event => setDraft(event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void send(); } }} placeholder="Type your message…" rows={1} aria-label="Message"/><button className="send" type="submit" disabled={sending || (!draft.trim() && !file)} aria-label="Send message"><Send size={19}/></button></form>
+  </section><aside className="dhl-chat-context"><span className="dhl-eyebrow">Shipment context</span><h2>Delivery at a glance</h2><StatusBadge status={status}/><dl><div><dt>TRACKING NUMBER</dt><dd>{thread.trackingId}</dd></div><div><dt>DESTINATION</dt><dd>{shipment?.delivery_address || 'Not available'}</dd></div><div><dt>RECIPIENT</dt><dd>{shipment?.receiver_name || 'Not available'}</dd></div><div><dt>LATEST CHECKPOINT</dt><dd>{latest?.location || 'No checkpoints recorded'}</dd></div></dl><Link className="dhl-secondary-button" to={`/track/${encodeURIComponent(thread.trackingId)}`} style={{ width: '100%' }}>View Full Tracking <ChevronRight size={16}/></Link></aside></div>;
+}
 
 export default function UserChat() {
-  const [trackingIdInput, setTrackingIdInput] = useState("");
-  const [activeThread, setActiveThread] = useState<{ id: string; trackingId: string } | null>(null);
-  const [validationError, setValidationError] = useState<string | null>(null);
-  const [alertNotice, setAlertNotice] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [params] = useSearchParams();
+  const [trackingId, setTrackingId] = useState(params.get('id') || '');
+  const [thread, setThread] = useState<ActiveThread | null>(null);
+  const [authenticated, setAuthenticated] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [opening, setOpening] = useState(false);
+  const [error, setError] = useState('');
   const navigate = useNavigate();
-
   useEffect(() => {
     let active = true;
-    const refreshAuth = async () => {
-      const { data } = await supabase.auth.getUser();
-      if (active) {
-        setIsAuthenticated(Boolean(data.user));
-        setAuthLoading(false);
-      }
-    };
-    void refreshAuth();
-    const { data: listener } = supabase.auth.onAuthStateChange(() => {
-      void refreshAuth();
-    });
-    return () => {
-      active = false;
-      listener.subscription.unsubscribe();
-    };
+    const refresh = async () => { const { data } = await supabase.auth.getUser(); if (active) { setAuthenticated(Boolean(data.user)); setCheckingAuth(false); } };
+    void refresh();
+    const { data } = supabase.auth.onAuthStateChange(() => { void refresh(); });
+    return () => { active = false; data.subscription.unsubscribe(); };
   }, []);
-
-  useEffect(() => {
-    const prevBodyOverflow = document.body.style.overflow;
-    const prevBodyHeight = document.body.style.height;
-    const prevHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.body.style.height = "100%";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = prevBodyOverflow;
-      document.body.style.height = prevBodyHeight;
-      document.documentElement.style.overflow = prevHtmlOverflow;
-    };
-  }, []);
-
-  const handleUnlock = async () => {
-    if (!isAuthenticated) {
-      navigate("/signin?next=/chat");
-      return;
-    }
-    const value = trackingIdInput.trim();
-    if (!value) return;
-
-    setOpening(true);
-    setValidationError(null);
-    const thread = await ensureChatThread(value);
+  const open = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!authenticated) { navigate(`/signin?next=${encodeURIComponent(`/chat?id=${trackingId.trim()}`)}`); return; }
+    if (!trackingId.trim()) { setError('Enter a tracking number.'); return; }
+    setOpening(true); setError('');
+    const active = await ensureChatThread(trackingId.trim());
+    if (!active) setError('Tracking number not found, or this account is not authorized for the shipment.');
+    else setThread({ id: active.id, trackingId: active.trackingId });
     setOpening(false);
-
-    if (!thread) {
-      setActiveThread(null);
-      setValidationError("Tracking ID not found or you are not authorized to access this conversation.");
-      return;
-    }
-
-    setActiveThread({ id: thread.id, trackingId: value });
-    setAlertNotice("Tracking ID verified");
-    window.setTimeout(() => setAlertNotice(null), 2000);
   };
-
-  return (
-    <div className="relative min-h-screen h-[100svh] w-full overflow-hidden bg-[#0B1220] text-white">
-      <div className="absolute inset-0 bg-[url('https://w0.peakpx.com/wallpaper/818/148/HD-wallpaper-whatsapp-background-cool-dark-green-new-theme-whatsapp.jpg')] bg-cover bg-center opacity-60" />
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(to_top,rgba(3,7,18,0.98)_0%,rgba(3,7,18,0.9)_45%,rgba(3,7,18,0.5)_70%,rgba(3,7,18,0)_90%)]" />
-
-      <div className="relative z-10 flex h-full w-full flex-col">
-        {!activeThread ? (
-          <div className="flex h-full items-center justify-center px-6">
-            <div className="w-full max-w-md rounded-3xl border border-white/15 bg-white/10 p-8 text-center shadow-2xl backdrop-blur-2xl">
-              <h1 className="text-3xl font-black tracking-tighter">
-                {isAuthenticated ? "Enter Your Tracking ID" : "Sign in to access chat"}
-              </h1>
-              <p className="mt-3 text-sm text-white/70">
-                {isAuthenticated
-                  ? "Access live shipment updates, delivery status, and real-time support."
-                  : "Private shipment messages are available only to authenticated shipment participants."}
-              </p>
-              {isAuthenticated && <input
-                value={trackingIdInput}
-                onChange={(event) => setTrackingIdInput(event.target.value)}
-                placeholder="e.g. TRK-2026-0042"
-                className="mt-6 h-12 w-full rounded-full border border-white/20 bg-white/5 px-5 text-sm text-white placeholder:text-white/40 focus:border-white/40 focus:outline-none"
-              />}
-              {validationError && (
-                <div className="mt-3 rounded-2xl border border-red-400/40 bg-red-500/10 px-4 py-2 text-xs text-red-200">
-                  {validationError}
-                </div>
-              )}
-              <button
-                type="button"
-                onClick={handleUnlock}
-                className="mt-6 w-full rounded-full bg-white px-6 py-3 text-sm font-semibold text-black shadow-lg transition hover:bg-white/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60"
-                disabled={authLoading || opening}
-              >
-                {authLoading
-                  ? "Checking account..."
-                  : !isAuthenticated
-                    ? "Sign In"
-                    : opening
-                      ? "Verifying Tracking ID..."
-                  : "Open Tracking Chat"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          <ChatThread
-            trackingId={activeThread.trackingId}
-            threadId={activeThread.id}
-            role="user"
-            title="Shipment Command Line"
-            subtitle="Live tracking support"
-            accentClassName="bg-[#1E40AF]"
-            alertNotice={alertNotice}
-          />
-        )}
-      </div>
-    </div>
-  );
+  if (thread) return <CustomerConversation thread={thread} onBack={() => setThread(null)}/>;
+  return <div className="dhl-support-gate"><PageHeading title="Customer Support" backTo="/home"/><div className="dhl-support-gate-icon"><Headphones size={34}/></div><span className="dhl-eyebrow">Shipment support</span><h1>Connect to Shipment Support</h1><p>Private support conversations are linked to your shipment. Sign in as the sender or recipient to continue.</p><form onSubmit={open}><label htmlFor="support-tracking">Tracking number</label><input id="support-tracking" value={trackingId} onChange={event => setTrackingId(event.target.value)} placeholder="Enter your tracking number" autoComplete="off"/>{error && <p className="dhl-error-text" role="alert">{error}</p>}<button className="dhl-primary-button" type="submit" disabled={checkingAuth || opening}>{checkingAuth ? 'Checking account…' : opening ? 'Verifying shipment…' : authenticated ? 'Continue to Chat' : 'Sign In to Continue'} <ChevronRight size={18}/></button></form><p style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 22, fontSize: 12 }}><ShieldCheck size={16}/> Access is verified against your shipment account.</p></div>;
 }

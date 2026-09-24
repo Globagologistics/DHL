@@ -5,6 +5,8 @@ import Onboarding from "./pages/Onboarding";
 import TrackShipmentSearch from "./pages/TrackShipmentSearch";
 import TrackShipment from "./pages/TrackShipment";
 import UserChat from "./pages/UserChat";
+import Settings from "./pages/Settings";
+import SendShipment from "./pages/SendShipment";
 import About from "./pages/About";
 import Locations from "./pages/Locations";
 import Solutions from "./pages/Solutions";
@@ -30,8 +32,11 @@ export const router = createBrowserRouter([
       { path: "track", Component: TrackShipmentSearch },
       { path: "track-shipment", Component: TrackShipmentSearch },
       { path: "track/:id", Component: TrackShipment },
+      { path: "track/:id/timeline", Component: TrackShipment },
       { path: "track-shipment/:id", Component: TrackShipment },
       { path: "chat", Component: UserChat },
+      { path: "settings", Component: Settings },
+      { path: "send-shipment", Component: SendShipment },
       { path: "locations", Component: Locations },
       { path: "solutions", Component: Solutions },
       { path: "about", Component: About },

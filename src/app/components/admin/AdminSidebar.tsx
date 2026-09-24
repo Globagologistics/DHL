@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import { LayoutDashboard, PlusCircle, MessageCircle, Mail } from "lucide-react";
+import { brandConfig } from '../../../config/brand';
 
 type AdminSidebarProps = {
   onNavigate?: () => void;
@@ -51,15 +52,15 @@ export default function AdminSidebar({ onNavigate, className }: AdminSidebarProp
       <div className="px-6 py-6">
         <div className="flex items-center gap-3">
           <img
-            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTwdV07RyApr_mVZOJRk3Rht0P98deLiSYB0Q&s"
-            alt="Buske Logistics logo"
+            src={brandConfig.favicon}
+            alt={`${brandConfig.appName} concept icon`}
             className="h-10 w-10 rounded-full object-cover shadow-lg"
           />
           <div>
             <div className="text-sm font-semibold uppercase tracking-[0.2em] text-white/70">
               Admin
             </div>
-            <div className="text-lg font-bold text-white">Buske Command</div>
+            <div className="text-lg font-bold text-white">{brandConfig.shortName} Command</div>
           </div>
         </div>
       </div>
