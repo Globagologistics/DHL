@@ -35,14 +35,17 @@ Apply these on a **staging copy first**, then production. None of the Part One S
 | `20260815000000_fix_chat_thread_authorization.sql` | `ensure_chat_thread` RPC |
 | `20260924000000_shipment_requests.sql` | Public request queue and approve/reject RPCs |
 | `20260924000001_chat_replies_and_support_personas.sql` | Reply threading and support persona columns |
-| `20260925000000_numeric_tracking_numbers.sql` | **New:** 12-digit `tracking_number` (random, unique, immutable) with backfill |
-| `20260925000001_shipment_details.sql` | **New:** `shipment_details` JSON column; approval carries wizard details |
+| `20260925000000_numeric_tracking_numbers.sql` | **New:** 12-digit `tracking_number` (random, unique, immutable once set). Assigned at publish; existing published rows are backfilled |
+| `20260925000001_shipment_details.sql` | **New:** `shipment_details` JSON column (earlier wizard; kept for compatibility) |
 | `20260925000002_app_settings.sql` | **New:** `app_settings` for non-secret settings (RLS: public keys readable, admin writes) |
+| `20260926000000_shipment_lifecycle.sql` | **New:** `lifecycle_state` + events, package value, outstanding amount, carrier role, `started_at`, route coordinates and labels, `route_progress`, soft delete; RPCs `publish_shipment`, `transition_shipment`, `add_shipment_update`, `soft_delete_shipment`; public request and approval redefined (approval creates a SCHEDULED shipment) |
+| `20260926000001_chat_message_deletion.sql` | **New:** admin-only `delete_support_message` RPC with an admin-only audit table; deleted rows lose their content |
 
 With the Supabase CLI linked to the target project: review `supabase db push --dry-run`, then run `supabase db push`.
 
 **Check:**
-- `select tracking_number from shipments limit 5;` returns 12-digit values.
+- Publishing a test shipment returns a 12-digit number (`select publish_shipment('<id>');` as the admin), and unpublished shipments have `tracking_number` NULL.
+- `select transition_shipment('<id>', 'start');` moves it to `in_transit` and sets `started_at`; `pause` without a reason is rejected.
 - `select key, is_public from app_settings;` returns four rows: `application` and `whatsapp` are public.
 - The immediate-dispatch webhook in `20260813000004` points at the **production** Netlify URL with the production dispatch secret. Edit it before applying if it names another host.
 
@@ -94,7 +97,9 @@ Netlify → Site configuration → Environment variables (build scope):
 | `VITE_APP_BASE_URL` | `https://<domain>` |
 | `VITE_WHATSAPP_NUMBER` | Optional bootstrap number until Settings saves one |
 
-Ensure `VITE_DEV_ADMIN_BYPASS`, `VITE_ENABLE_ADMIN_SHORTCUT`, `VITE_ENABLE_DEMO_SHIPMENT` and `VITE_SETTINGS_DEV_ADAPTER` are **unset**. They are ignored in production builds anyway. The development demo shipment (`010101010101`, `src/demo/`) only exists when a dev build has `VITE_ENABLE_DEMO_SHIPMENT=true`. Once real shipments exist, `src/demo/` can be deleted together with its guarded calls in `trackingService`, `useSupabase` and `useChat`.
+Ensure `VITE_DEV_ADMIN_BYPASS`, `VITE_ENABLE_ADMIN_SHORTCUT`, `VITE_ENABLE_DEMO_SHIPMENT` and `VITE_SETTINGS_DEV_ADAPTER` are **unset**. They are ignored in production builds anyway. `VITE_ENABLE_DEMO_SHIPMENT=true` in a dev build turns on the development data store (`src/demo/`: demo shipment `010101010101`, shipments and requests created while signed out, and their chats), kept in the browser's localStorage. Once real shipments exist, `src/demo/` can be deleted together with its guarded calls in `trackingService`, `shipmentWorkflowService`, `shipmentRequestService`, `useSupabase`, `useChat` and `AdminContext`.
+
+The route map needs no configuration: country outlines, US state borders and the location gazetteer ship with the build (see `ATTRIBUTIONS.md`). To refresh the gazetteer, download the GeoNames files listed in `scripts/build-gazetteer.mjs` and run it.
 
 ## 8. Configure secure SMTP storage and the server function
 
