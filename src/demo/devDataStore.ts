@@ -1,4 +1,4 @@
-import { DEMO_SHIPMENT_RECORD_ID, buildDemoShipment, isDemoShipmentEnabled } from './demoShipment';
+import { DEMO_PACKAGE_IMAGES, DEMO_SHIPMENT_RECORD_ID, buildDemoShipment, isDemoShipmentEnabled } from './demoShipment';
 import { applyTransition, deriveLifecycleState, makeEvent } from '../features/shipments/lifecycle';
 import type { LifecycleAction } from '../features/shipments/lifecycle';
 import type { ShipmentRequest, ShipmentRequestPayload } from '../features/shipments/types';
@@ -18,7 +18,7 @@ import type { Shipment, ShipmentWithCheckpoints } from '../types/database';
  */
 
 const KEY = 'dhl-dev-data-v2';
-const SEED_VERSION = 2;
+const SEED_VERSION = 4;
 
 export type DevNotification = { id: string; shipmentId: string; trackingNumber: string | null; type: string; message: string; createdAt: string };
 type DevState = { version: number; shipments: ShipmentWithCheckpoints[]; requests: ShipmentRequest[]; notifications: DevNotification[] };
@@ -42,6 +42,19 @@ function read(): DevState {
   try {
     const parsed = JSON.parse(localStorage.getItem(KEY) || 'null') as DevState | null;
     if (parsed?.version === SEED_VERSION) { memory = parsed; return parsed; }
+    // Upgrade the existing demo record without clearing locally created shipments,
+    // requests, or notifications.
+    if (parsed?.version === 2 || parsed?.version === 3) {
+      memory = {
+        ...parsed,
+        version: SEED_VERSION,
+        shipments: parsed.shipments.map(shipment => shipment.id === DEMO_SHIPMENT_RECORD_ID
+          ? { ...shipment, images: DEMO_PACKAGE_IMAGES }
+          : shipment),
+      };
+      persist(memory, false);
+      return memory;
+    }
   } catch { /* reseed below */ }
   memory = seed();
   persist(memory, false);

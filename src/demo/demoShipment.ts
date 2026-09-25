@@ -15,6 +15,11 @@ export const DEMO_TRACKING_ID = '010101010101';
 /** UUID-shaped record id so chat and admin routes treat it like a real shipment. */
 export const DEMO_SHIPMENT_RECORD_ID = '00000000-0000-4000-8000-010101010101';
 export const DEMO_CUSTOMER_NAME = 'Daniel Carter';
+export const DEMO_PACKAGE_IMAGES = [
+  '/images/demo-package.jpg',
+  '/images/demo-package-2.jpg',
+  '/images/demo-package-3.jpg',
+];
 
 export const isDemoShipmentEnabled = () => environment.demoShipment;
 
@@ -85,8 +90,8 @@ export function buildDemoShipment(now = Date.now()): ShipmentWithCheckpoints {
     carrier_role: 'Pilot',
     driver_name: 'Capt. Marcus Hale',
     package_name: 'Personal package',
-    // Existing bundled images stand in for package photos in development.
-    images: ['/images/dhl-logistics-campaign.jpeg', '/images/dhl-cinematic-portrait.webp', '/images/dhl-cinematic-landscape.webp'],
+    // Reuse the supplied package photo for all three demo package images.
+    images: DEMO_PACKAGE_IMAGES,
     package_value: 1200,
     cost: 0,
     currency: 'USD',

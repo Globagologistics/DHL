@@ -37,9 +37,12 @@ export default function Onboarding() {
             <span className="dhl-welcome-highlight">Worldwide.</span>
           </h1>
           <p>Real-time shipment updates, delivery progress and customer support in one seamless experience.</p>
-          <Link to="/home" className="dhl-welcome-cta">
-            Get Started <ArrowRight size={19} aria-hidden="true" />
-          </Link>
+          <div className="dhl-welcome-actions">
+            <Link to="/home" className="dhl-welcome-cta">
+              Get Started <ArrowRight size={19} aria-hidden="true" />
+            </Link>
+            <Link to="/signin" className="dhl-welcome-signin">Sign in</Link>
+          </div>
         </div>
       </div>
     </section>

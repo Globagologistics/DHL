@@ -8,7 +8,7 @@ export const brandConfig = {
   shipmentLabel: 'Shipment',
   // Public browser metadata remains neutral; on-screen brand presentation is
   // intentionally isolated from the public deployment identity.
-  pageTitle: 'Shipment Tracking Demo',
+  pageTitle: 'Shipment Tracking',
   metaDescription: 'Track your package seamlessly, follow delivery progress, and access shipment support from one place.',
   logo: '/dhl-concept-logo.svg',
   favicon: '/shipment-tracking-icon.svg',

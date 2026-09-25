@@ -1,0 +1,13 @@
+/* Shared copy control: one confirmation style everywhere a value can be copied. */
+.dhl-copy-action { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 8px; flex: 1 1 260px; min-width: 0; max-width: 100%; }
+.dhl-copy-action > button { min-width: 0; }
+.dhl-copy-status { flex: 1 1 100%; color: #2e9b50; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.dhl-copy-status:not(.visible) { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.dhl-copy-status.failed { color: #d40511; white-space: normal; }
+.dhl-copy-fallback { flex: 1 1 200px; min-width: 0; max-width: 100%; min-height: 38px; padding: 0 10px; border: 1px solid #d40511; border-radius: 9px; background: #fff; color: #1d1d1b; font-size: 12px; }
+
+@media (max-width: 767px) {
+  .dhl-copy-action { width: 100%; }
+  .dhl-copy-action > button { width: 100%; }
+  .dhl-copy-status { white-space: normal; }
+}

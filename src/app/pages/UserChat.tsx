@@ -4,6 +4,8 @@ import { ArrowLeft, ChevronRight, Headphones, Info, MapPin, Package, ShieldCheck
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ensureChatThread, markThreadRead, sendChatMessage, useChatMessages } from '../../hooks/useChat';
 import { TrackingNumberInput } from '../../features/tracking/TrackingNumberInput';
+import { SupportLookupState } from '../../features/tracking/TrackingStates';
+import { trackingCopy } from '../../features/tracking/trackingCopy';
 import { useTrackingLookup } from '../../features/tracking/useTrackingLookup';
 import { WhatsAppIcon, WhatsAppSupportButton } from '../../features/whatsapp/WhatsAppSupport';
 import { displayTrackingReference, formatTrackingNumber, isShipmentRecordId, trackingReferenceFor } from '../../services/trackingService';
@@ -97,24 +99,26 @@ export default function UserChat(){
   const back=()=>{setThread(null);setIssue(null);lookup.setDigits('');navigate('/chat',{replace:true});};
   if(thread)return <Conversation thread={thread} onBack={back}/>;
   const busy=phase==='searching'||opening||(phase==='found'&&!issue);
-  const submit=(event:FormEvent)=>{event.preventDefault();setIssue(null);if(phase==='error'){lookup.retry();return;}if(phase==='found'&&issue==='chat_unavailable'){lookup.retry();return;}if(!lookup.submit())input.current?.focus();};
+  const submit=(event:FormEvent)=>{event.preventDefault();setIssue(null);if(phase==='found'&&issue==='chat_unavailable'){lookup.retry();return;}if(!lookup.submit())input.current?.focus();};
+  // Returns to the field with the digits intact, without searching again.
+  const editNumber=()=>{setIssue(null);setCharWarning(false);lookup.reset();window.setTimeout(()=>{input.current?.focus();input.current?.select();},0);};
   const helperId=`${fieldId}-status`;
   const status=issue==='chat_unavailable'?<span className="dhl-support-signin">We found your shipment, but a support conversation needs you to sign in with the email linked to it. <Link to={`/signin?next=${encodeURIComponent(`/chat?id=${searchedNumber||digits}`)}`}>Sign in</Link></span>
-    :charWarning?<span className="dhl-error-text">Tracking numbers can contain numbers only.</span>
+    :charWarning?<span className="dhl-error-text">{trackingCopy.nonNumeric}</span>
     :phase==='searching'||opening?<><span className="dhl-support-spinner"/> {opening?'Opening your conversation…':'Checking shipment…'}</>
     :phase==='found'?<><ShieldCheck size={17}/> Shipment found</>
-    :phase==='not_found'?<span className="dhl-error-text">We couldn’t find a shipment matching this tracking number. Check the 12 digits on your receipt.</span>
-    :phase==='error'?<span className="dhl-error-text">We’re having trouble checking this shipment right now. This is a connection problem on our side, not a problem with your tracking number.</span>
-    :phase==='incomplete'?<span className="dhl-error-text">Enter the complete 12-digit tracking number.</span>
-    :phase==='typing'?<span className="dhl-support-neutral">Tracking numbers contain 12 digits.</span>
+    :phase==='incomplete'?<span className="dhl-error-text">{trackingCopy.submittedIncomplete}</span>
+    :phase==='typing'?<span className="dhl-support-neutral">{trackingCopy.incomplete}</span>
     :phase==='ready'?<span className="dhl-support-neutral">Checking automatically…</span>
     :null;
   return <section className="dhl-support-page"><picture className="dhl-support-background" aria-hidden="true"><source media="(min-width: 900px) and (orientation: landscape)" srcSet={brandConfig.cinematicLandscape.webp} type="image/webp"/><source media="(min-width: 900px) and (orientation: landscape)" srcSet={brandConfig.cinematicLandscape.fallback} type="image/jpeg"/><source srcSet={brandConfig.cinematicPortrait.webp} type="image/webp"/><img src={brandConfig.cinematicPortrait.fallback} alt=""/></picture><div className="dhl-support-wash" aria-hidden="true"/>
     <div className="dhl-support-gate"><div className="dhl-support-gate-icon"><Headphones size={30}/></div><span className="dhl-eyebrow">Customer support</span><h1>Connect to<br/>Shipment Support</h1><p>Enter your 12-digit tracking number to start a support conversation linked to your shipment.</p>
-      <form onSubmit={submit} noValidate><label htmlFor={fieldId}>Tracking number</label><div className={`dhl-support-input-wrap${phase==='incomplete'||charWarning?' invalid':''}`}><Package size={19} aria-hidden="true"/><TrackingNumberInput id={fieldId} ref={input} value={digits} onRejectedInput={()=>setCharWarning(true)} onValueChange={value=>{if(value!==digits)setCharWarning(false);setIssue(null);lookup.setDigits(value);}} placeholder="0000 0000 0000" aria-describedby={helperId} aria-invalid={phase==='incomplete'||charWarning}/></div>
+      {phase==='not_found'||phase==='error'
+        ? <SupportLookupState variant={phase==='not_found'?'not_found':'error'} trackingNumber={searchedNumber||digits} onTryAgain={lookup.retry} onEdit={editNumber}/>
+        : <form onSubmit={submit} noValidate><label htmlFor={fieldId}>Tracking number</label><div className={`dhl-support-input-wrap${phase==='incomplete'||charWarning?' invalid':''}`}><Package size={19} aria-hidden="true"/><TrackingNumberInput id={fieldId} ref={input} value={digits} onRejectedInput={()=>setCharWarning(true)} onValueChange={value=>{if(value!==digits)setCharWarning(false);setIssue(null);lookup.setDigits(value);}} placeholder="0000 0000 0000" aria-describedby={helperId} aria-invalid={phase==='incomplete'||charWarning}/></div>
         <div id={helperId} className="dhl-support-verification" role="status" aria-live="polite">{status}</div>
-        <button className="dhl-support-continue" type="submit" disabled={busy}>{phase==='error'?'Try Again':'Continue to Support'} <ChevronRight size={18}/></button>
+        <button className="dhl-support-continue" type="submit" disabled={busy}>Continue to Support <ChevronRight size={18}/></button>
         <WhatsAppSupportButton trackingId={digits.length===12?digits:null} className="dhl-whatsapp-action dhl-support-alt"><WhatsAppIcon size={18}/> Chat on WhatsApp instead</WhatsAppSupportButton>
-      </form>
+      </form>}
       <p className="dhl-support-helper"><ShieldCheck size={17}/> Access to a conversation is verified by the shipment support service.</p></div></section>;
 }

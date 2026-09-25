@@ -1,5 +1,9 @@
 import { supabase } from '../lib/supabase';
 import { findDevShipment } from '../demo/devDataStore';
+import { classifyNetworkFailure, classifyShipmentQuery } from './trackingClassification';
+import type { QueryError, ShipmentReferenceRow, TrackingLookupResult } from './trackingClassification';
+
+export type { TrackingLookupResult } from './trackingClassification';
 
 /** Customer tracking numbers are exactly 12 numeric digits. */
 export const TRACKING_NUMBER_LENGTH = 12;
@@ -32,24 +36,7 @@ export function resolveShipmentReference(reference: string): { column: 'tracking
   return null;
 }
 
-export type TrackingLookupResult =
-  | { status: 'found'; shipmentId: string; trackingNumber: string | null }
-  | { status: 'not_found' }
-  | { status: 'error' };
-
-type ShipmentReferenceRow = { id: string; tracking_number?: string | null };
-type QueryError = { code?: string; message?: string } | null;
-
 const LOOKUP_TIMEOUT_MS = 15_000;
-
-/**
- * Before migration 20260925000000 the tracking_number column does not exist.
- * No shipment can then carry a 12-digit number, so the honest answer for a
- * well-formed number is "not found", not a connection problem.
- */
-export function isMissingTrackingColumn(error: QueryError) {
-  return Boolean(error && (error.code === '42703' || (/tracking_number/i.test(error.message || '') && /does not exist|could not find/i.test(error.message || ''))));
-}
 
 export function withLookupTimeout<T>(request: PromiseLike<T>): Promise<T> {
   let timer: number | undefined;
@@ -69,17 +56,16 @@ export async function lookupShipmentReference(reference: string): Promise<Tracki
   const target = resolveShipmentReference(reference);
   if (!target) return { status: 'not_found' };
   try {
-    // select('*') works before and after the tracking_number migration.
-    const { data, error } = await withLookupTimeout<{ data: unknown; error: QueryError }>(supabase.from('shipments').select('*').eq(target.column, target.value).limit(1));
+    const { data, error } = await withLookupTimeout<{ data: ShipmentReferenceRow | null; error: QueryError }>(
+      supabase.from('shipments').select('id, tracking_number').eq(target.column, target.value).maybeSingle(),
+    );
     if (error) {
-      if (target.column === 'tracking_number' && isMissingTrackingColumn(error)) return { status: 'not_found' };
       if (import.meta.env.DEV) console.warn('Shipment lookup failed:', error);
-      return { status: 'error' };
+      return classifyShipmentQuery(data, error);
     }
-    const row = (data as ShipmentReferenceRow[] | null)?.[0];
-    return row ? { status: 'found', shipmentId: row.id, trackingNumber: row.tracking_number ?? null } : { status: 'not_found' };
+    return classifyShipmentQuery(data, null);
   } catch {
-    return { status: 'error' };
+    return classifyNetworkFailure();
   }
 }
 

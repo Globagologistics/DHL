@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase';
-import { environment } from '../../config/environment';
+import { appUrlFor } from '../../config/environment';
 import type { AdminAccountSettings } from '../../features/settings/types';
 
 /**
@@ -83,8 +83,7 @@ export async function signOutAllSessions(): Promise<void> {
 export async function sendAdminPasswordReset(email: string): Promise<string> {
   const target = email.trim();
   if (!EMAIL_PATTERN.test(target)) throw new Error('No administrator email is available for recovery.');
-  const base = (environment.appUrl || window.location.origin).replace(/\/$/, '');
-  const { error } = await supabase.auth.resetPasswordForEmail(target, { redirectTo: `${base}/reset-password` });
+  const { error } = await supabase.auth.resetPasswordForEmail(target, { redirectTo: appUrlFor('/reset-password') });
   if (error) throw new Error(error.message || 'Reset email could not be sent.');
   return `A password reset link was sent to ${target}.`;
 }

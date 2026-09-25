@@ -2,7 +2,8 @@ import React, { useContext, useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { AdminContext, Shipment, Checkpoint } from '../contexts/AdminContext';
-import { Copy, CheckCircle2, X } from 'lucide-react';
+import { Check, Copy, CheckCircle2, X } from 'lucide-react';
+import { useCopyAction } from '../../hooks/useCopyAction';
 
 const transportOptions = [
   'Air Freight',
@@ -58,7 +59,7 @@ export default function AdminForm() {
 
   const [formData, setFormData] = useState<any>(initialData);
   const [submittedTrackingId, setSubmittedTrackingId] = useState<string | null>(null);
-  const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const trackingCopy = useCopyAction();
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const selectedImageFiles: File[] = Array.isArray(formData.imageFiles) ? formData.imageFiles : [];
@@ -291,13 +292,7 @@ export default function AdminForm() {
     }
   };
 
-  const handleCopyTrackingId = () => {
-    if (submittedTrackingId) {
-      navigator.clipboard.writeText(submittedTrackingId);
-      setCopiedToClipboard(true);
-      setTimeout(() => setCopiedToClipboard(false), 2000);
-    }
-  };
+  const handleCopyTrackingId = () => { if (submittedTrackingId) void trackingCopy.copy(submittedTrackingId); };
 
   if (submittedTrackingId) {
     return (
@@ -323,9 +318,10 @@ export default function AdminForm() {
             onClick={handleCopyTrackingId}
             className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-[#2563EB] text-white font-semibold rounded-lg hover:bg-[#1e4a9b] transition-all duration-300 mb-4"
           >
-            <Copy className="w-5 h-5" />
-            {copiedToClipboard ? 'Copied to Clipboard!' : 'Copy Tracking ID'}
+            {trackingCopy.copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+            {trackingCopy.copied ? '✓ Copied to clipboard' : 'Copy Tracking ID'}
           </button>
+          <p className="text-sm text-red-600 mb-4" role="status" aria-live="polite">{trackingCopy.failed ? trackingCopy.message : ''}</p>
 
           <button
             onClick={() => navigate('/admin')}

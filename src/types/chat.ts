@@ -4,6 +4,8 @@ export type MediaType = "image" | "video";
 export interface MediaAttachment {
   id: string;
   url: string;
+  /** Private chat-media object path. Public legacy URLs omit this value. */
+  storagePath?: string;
   type: MediaType;
   name: string;
 }

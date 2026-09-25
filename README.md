@@ -1,4 +1,4 @@
-# Shipment Tracking Demo
+# Shipment Tracking
 
 This private, unofficial logistics interface concept adapts an existing application to the visual reference in `design-reference/dhl-redesign/`. The existing Supabase shipment, chat, storage, admin, and notification code remains the functional source of truth. The design reference contains visual prototype state and is not used as a data source.
 

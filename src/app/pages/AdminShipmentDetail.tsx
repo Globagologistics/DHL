@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { ArrowLeft, CheckCircle2, Clock3, Copy, ExternalLink, FileText, History, Image as ImageIcon, MapPinned, MessageCircle, Package, Pencil, Radio, Send, Trash2, UserRound, X } from 'lucide-react';
 import { useShipmentWithCheckpoints } from '../../hooks/useSupabase';
 import { supabase } from '../../lib/supabase';
+import { CopyButton } from '../../features/clipboard/CopyButton';
 import { ImageCarousel } from '../../features/media/ImageCarousel';
 import { RoutePicker } from '../../features/map/RoutePicker';
 import { ShipmentRouteCard } from '../../features/map/ShipmentRouteCard';
@@ -90,7 +91,6 @@ export default function AdminShipmentDetail() {
   const [dialog, setDialog] = useState<LifecycleAction | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const [notice, setNotice] = useState(params.get('created') ? 'Shipment created and scheduled. Publish it when you are ready to issue the tracking number.' : params.get('saved') ? 'Changes saved.' : '');
-  const [copied, setCopied] = useState(false);
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [update, setUpdate] = useState<{ title: string; location: string; point: RoutePoint | null }>({ title: '', location: '', point: null });
   const [manualPins, setManualPins] = useState(false);
@@ -122,7 +122,6 @@ export default function AdminShipmentDetail() {
   const whatsappUpdate = done ? whatsappToPhone(shipment.receiver_phone, customerUpdateMessage({ ...shipment, tracking_number: done.trackingNumber || shipment.tracking_number }, done.action, done.reason)) : null;
   const greeting = `Hello ${shipment.receiver_name}, this is DHL Shipment Support${published ? ` about shipment ${trackingNumber}` : ''}.`;
   const whatsappReceiver = whatsappToPhone(shipment.receiver_phone, greeting);
-  const copy = () => { void navigator.clipboard?.writeText(trackingNumber).then(() => { setCopied(true); window.setTimeout(() => setCopied(false), 1600); }); };
   const primary = actions.filter(action => ['publish', 'start', 'resume', 'restart'].includes(action));
   const secondary = actions.filter(action => !primary.includes(action));
 
@@ -160,7 +159,7 @@ export default function AdminShipmentDetail() {
       </div>
       <div className={`dhl-control-tracking${published ? ' issued' : ''}`}>
         <small>Tracking Number</small>
-        {published ? <><strong>{formatTrackingNumber(trackingNumber)}</strong><div><button type="button" className="dhl-admin-button" onClick={copy}><Copy size={15} />{copied ? 'Copied' : 'Copy Tracking Number'}</button><a className="dhl-admin-button" href={`/track/${trackingNumber}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />Open Public Tracking</a></div></>
+        {published ? <><strong>{formatTrackingNumber(trackingNumber)}</strong><div><CopyButton value={trackingNumber} className="dhl-admin-button" icon={<Copy size={15} aria-hidden="true" />} label="Copy Tracking Number" /><a className="dhl-admin-button" href={`/track/${trackingNumber}`} target="_blank" rel="noopener noreferrer"><ExternalLink size={15} />Open Public Tracking</a></div></>
           : <span>Assigned automatically when you publish.</span>}
       </div>
     </section>

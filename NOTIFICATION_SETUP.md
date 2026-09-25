@@ -61,7 +61,7 @@ They are server-only; none may be prefixed with `VITE_`.
 | `SMTP_USER` | The Gmail/Google Workspace address used to send mail. |
 | `SMTP_APP_PASSWORD` | A Google App Password generated for that Gmail account. |
 | `ADMIN_EMAIL` | The private operations/admin notification inbox. |
-| `APP_NAME` | `Shipment Tracking Demo` for the neutral public deployment identity. |
+| `APP_NAME` | `Shipment Tracking` for the neutral public deployment identity. |
 | `APP_URL` | The neutral production site origin, for example `https://shipment-tracking-demo.example`. |
 | `SUPABASE_URL` | Your Supabase project URL (non-`VITE_` copy for the server). |
 | `SUPABASE_SECRET_KEY` | A current Supabase `sb_secret_...` key; Netlify only, never frontend. |

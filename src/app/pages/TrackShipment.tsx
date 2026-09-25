@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate, useParams, useSearchParams } from 'reac
 import { AlertTriangle, Check, ChevronRight, Clock3, Copy, FileText, Image as ImageIcon, Map, Package, PlaneTakeoff, Truck, X } from 'lucide-react';
 import { PageHeading, ShipmentProgress, StatusBadge } from '../components/customer/CustomerShell';
 import { useShipmentWithCheckpoints } from '../../hooks/useSupabase';
+import { useCopyAction } from '../../hooks/useCopyAction';
+import { CopyStatus } from '../../features/clipboard/CopyButton';
 import { supabase } from '../../lib/supabase';
 import { brandConfig } from '../../config/brand';
 import { TrackingErrorState, TrackingNotFoundState, TrackingSearchingState, TrackingStage } from '../../features/tracking/TrackingStates';
@@ -83,7 +85,8 @@ function TimelineEvent({ entry, latest }: { entry: TimelineEntry; latest: boolea
 function SummaryCard({ shipment, now }: { shipment: ShipmentWithCheckpoints; now: number }) {
   const state = deriveLifecycleState(shipment);
   const trackingRef = trackingReferenceFor(shipment);
-  return <section className="dhl-card dhl-result-summary"><div className="dhl-result-top"><div><span className="dhl-eyebrow">Tracking number</span><button className="dhl-text-button" onClick={() => navigator.clipboard?.writeText(trackingRef)} title="Copy tracking number"><strong className="dhl-tracking-reference">{displayTrackingReference(shipment)}</strong><Copy size={16}/></button></div><StatusBadge status={lifecycleLabels[state]}/></div><div className="dhl-result-delivery"><div><small>ESTIMATED DELIVERY</small><strong>{estimatedDelivery(shipment)}</strong></div><Truck size={26}/></div><ShipmentProgress value={displayProgress(shipment, now)}/></section>;
+  const trackingCopy = useCopyAction();
+  return <section className="dhl-card dhl-result-summary"><div className="dhl-result-top"><div><span className="dhl-eyebrow">Tracking number</span><button className="dhl-text-button" onClick={() => void trackingCopy.copy(trackingRef)} title="Copy tracking number"><strong className="dhl-tracking-reference">{displayTrackingReference(shipment)}</strong>{trackingCopy.copied ? <Check size={16}/> : <Copy size={16}/>}</button><CopyStatus copied={trackingCopy.copied} failed={trackingCopy.failed} failureMessage="Unable to copy. Please copy the tracking number manually." /></div><StatusBadge status={lifecycleLabels[state]}/></div><div className="dhl-result-delivery"><div><small>ESTIMATED DELIVERY</small><strong>{estimatedDelivery(shipment)}</strong></div><Truck size={26}/></div><ShipmentProgress value={displayProgress(shipment, now)}/></section>;
 }
 
 function Timeline({ shipment, now, openDetail }: { shipment: ShipmentWithCheckpoints; now: number; openDetail: (detail: Detail) => void }) {

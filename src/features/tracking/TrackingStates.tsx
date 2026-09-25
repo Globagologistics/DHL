@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Check, CheckCircle2, Headphones, PackageSearch, PackageX, PencilLine, RotateCcw, Truck, WifiOff } from 'lucide-react';
 import { brandConfig } from '../../config/brand';
 import { formatTrackingNumber } from '../../services/trackingService';
+import { trackingCopy } from './trackingCopy';
 import { WhatsAppIcon, WhatsAppSupportButton } from '../whatsapp/WhatsAppSupport';
 
 /**
@@ -51,7 +52,7 @@ function NumberChip({ label, value }: { label: string; value: string }) {
 export function TrackingSearchingState({ trackingNumber }: { trackingNumber?: string }) {
   return <div className="dhl-track-sheet"><div className="dhl-track-state searching">
     <span className="dhl-track-state-icon searching" aria-hidden="true"><PackageSearch size={30} /><i /></span>
-    <h2>Searching for your shipment</h2>
+    <h2>{trackingCopy.searching}</h2>
     <p>Checking our shipment network…</p>
     {trackingNumber && <NumberChip label="Tracking number" value={trackingNumber} />}
     <div className="dhl-track-progress" aria-hidden="true"><span /></div>
@@ -61,7 +62,7 @@ export function TrackingSearchingState({ trackingNumber }: { trackingNumber?: st
 export function TrackingFoundState({ trackingNumber }: { trackingNumber: string }) {
   return <div className="dhl-track-sheet"><div className="dhl-track-state found">
     <span className="dhl-track-state-icon found" aria-hidden="true"><CheckCircle2 size={30} /></span>
-    <h2>Shipment found</h2>
+    <h2>{trackingCopy.found}</h2>
     <p>Opening your tracking details…</p>
     <NumberChip label="Tracking number" value={trackingNumber} />
   </div></div>;
@@ -71,10 +72,10 @@ export function TrackingFoundState({ trackingNumber }: { trackingNumber: string 
 export function TrackingNotFoundState({ trackingNumber, onTryAgain, onEdit }: { trackingNumber: string; onTryAgain?: () => void; onEdit?: () => void }) {
   return <div className="dhl-track-sheet"><div className="dhl-track-state not-found">
     <span className="dhl-track-state-icon not-found" aria-hidden="true"><PackageX size={30} /></span>
-    <h2>Shipment not found</h2>
-    <p>We couldn’t find a shipment matching this tracking number.</p>
-    <p className="dhl-track-state-note">Please confirm the 12-digit tracking number shown on your receipt or contact the sender for the correct shipment reference.</p>
-    <p className="dhl-track-state-hint">Make sure there are no missing or incorrect digits.</p>
+    <h2>{trackingCopy.notFound.title}</h2>
+    <p>{trackingCopy.notFound.message}</p>
+    <p className="dhl-track-state-note">{trackingCopy.notFound.note}</p>
+    <p className="dhl-track-state-hint">{trackingCopy.notFound.hint}</p>
     {trackingNumber && <NumberChip label="Tracking number entered" value={trackingNumber} />}
     <div className="dhl-track-state-actions">
       {onTryAgain ? <button type="button" className="dhl-primary-button" onClick={onTryAgain}><RotateCcw size={17} /> Try Again</button> : <Link className="dhl-primary-button" to={trackingNumber ? `/track?id=${trackingNumber}` : '/track'}><RotateCcw size={17} /> Try Again</Link>}
@@ -89,11 +90,32 @@ export function TrackingNotFoundState({ trackingNumber, onTryAgain, onEdit }: { 
 export function TrackingErrorState({ onRetry, onBack }: { onRetry: () => void; onBack?: () => void }) {
   return <div className="dhl-track-sheet"><div className="dhl-track-state error">
     <span className="dhl-track-state-icon error" aria-hidden="true"><WifiOff size={30} /></span>
-    <h2>We’re having trouble checking this shipment right now.</h2>
-    <p>This is a connection problem on our side, not a problem with your tracking number. Please try again.</p>
+    <h2>{trackingCopy.error.title}</h2>
+    <p>{trackingCopy.error.message}</p>
     <div className="dhl-track-state-actions">
       <button type="button" className="dhl-primary-button" onClick={onRetry}><RotateCcw size={17} /> Try Again</button>
       {onBack ? <button type="button" className="dhl-secondary-button" onClick={onBack}><PencilLine size={17} /> Edit Tracking Number</button> : <Link className="dhl-secondary-button" to="/chat"><Headphones size={17} /> Customer Support</Link>}
     </div>
   </div></div>;
+}
+
+/**
+ * Customer Support outcome panel. Same semantics and wording as the Track
+ * page, in the compact form that fits inside the support gate card: a valid
+ * number with no shipment is "not found", never a connection problem.
+ */
+export function SupportLookupState({ variant, trackingNumber, onTryAgain, onEdit }: { variant: 'not_found' | 'error'; trackingNumber: string; onTryAgain: () => void; onEdit: () => void }) {
+  const notFound = variant === 'not_found';
+  return <div className={`dhl-support-state ${variant}`} role="alert">
+    <span className="dhl-support-state-icon" aria-hidden="true">{notFound ? <PackageX size={26} /> : <WifiOff size={26} />}</span>
+    <h2>{notFound ? trackingCopy.notFound.title : trackingCopy.error.title}</h2>
+    <p>{notFound ? trackingCopy.notFound.message : trackingCopy.error.message}</p>
+    {notFound && <p className="dhl-support-state-note">{trackingCopy.notFound.note}</p>}
+    {notFound && trackingNumber ? <NumberChip label="Tracking number entered" value={trackingNumber} /> : null}
+    <div className="dhl-support-state-actions">
+      <button type="button" className="dhl-support-continue" onClick={onTryAgain}><RotateCcw size={17} /> Try Again</button>
+      <button type="button" className="dhl-secondary-button" onClick={onEdit}><PencilLine size={17} /> Edit Tracking Number</button>
+      <WhatsAppSupportButton trackingId={trackingNumber || null} className="dhl-whatsapp-action dhl-support-alt"><WhatsAppIcon size={18} /> WhatsApp Support</WhatsAppSupportButton>
+    </div>
+  </div>;
 }

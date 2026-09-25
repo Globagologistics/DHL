@@ -36,6 +36,16 @@ type ChatMessageRow = {
 
 const CHAT_MEDIA_BUCKET = "chat-media";
 
+async function hydrateChatMedia(media: MediaAttachment[] | null | undefined): Promise<MediaAttachment[] | undefined> {
+  if (!media?.length) return media || undefined;
+  return Promise.all(media.map(async attachment => {
+    if (!attachment.storagePath) return attachment;
+    const { data, error } = await supabase.storage.from(CHAT_MEDIA_BUCKET).createSignedUrl(attachment.storagePath, 60 * 60);
+    if (error || !data?.signedUrl) return attachment;
+    return { ...attachment, url: data.signedUrl };
+  }));
+}
+
 const toThreadSummary = (row: ChatThreadRow): ChatThreadSummary => ({
   id: row.id,
   trackingId: row.tracking_id,
@@ -62,6 +72,11 @@ const toMessage = (row: ChatMessageRow): ChatMessage => ({
   replyToMessageId: row.reply_to_message_id ?? undefined,
   supportProfileId: row.support_profile_id ?? undefined,
   deletedAt: row.deleted_at ? new Date(row.deleted_at).getTime() : undefined,
+});
+
+const hydrateMessage = async (message: ChatMessage): Promise<ChatMessage> => ({
+  ...message,
+  media: await hydrateChatMedia(message.media),
 });
 
 /**
@@ -108,13 +123,10 @@ const uploadChatMedia = async (
         return null;
       }
 
-      const { data } = supabase.storage
-        .from(CHAT_MEDIA_BUCKET)
-        .getPublicUrl(filePath);
-
       return {
         id: fileId,
-        url: data.publicUrl,
+        url: filePath,
+        storagePath: filePath,
         type: file.type.startsWith("video/") ? "video" : "image",
         name: file.name,
       } as MediaAttachment;
@@ -219,7 +231,7 @@ export async function sendChatMessage(payload: {
     return { data: null, error: error.message };
   }
 
-  return { data: toMessage(data as ChatMessageRow), error: null };
+  return { data: await hydrateMessage(toMessage(data as ChatMessageRow)), error: null };
 }
 
 /**
@@ -375,7 +387,7 @@ export function useChatMessages(trackingId: string, threadId?: string, viewer: C
         return;
       }
 
-      setMessages((data as ChatMessageRow[]).map(toMessage));
+      setMessages(await Promise.all((data as ChatMessageRow[]).map(row => hydrateMessage(toMessage(row)))));
       setLoading(false);
     };
 
@@ -401,14 +413,16 @@ export function useChatMessages(trackingId: string, threadId?: string, viewer: C
           const oldRow = payload.old as ChatMessageRow;
 
           if (payload.eventType === "INSERT" && newRow) {
-            const next = toMessage(newRow);
-            setMessages((prev) => prev.some((msg) => msg.id === next.id) ? prev : [...prev, next]);
+            void hydrateMessage(toMessage(newRow)).then(next => {
+              setMessages((prev) => prev.some((msg) => msg.id === next.id) ? prev : [...prev, next]);
+            });
           }
 
           // A deletion arrives as an UPDATE with deleted_at set.
           if (payload.eventType === "UPDATE" && newRow) {
-            const next = toMessage(newRow);
-            setMessages((prev) => prev.map((msg) => (msg.id === next.id ? next : msg)));
+            void hydrateMessage(toMessage(newRow)).then(next => {
+              setMessages((prev) => prev.map((msg) => (msg.id === next.id ? next : msg)));
+            });
           }
 
           if (payload.eventType === "DELETE" && oldRow) {

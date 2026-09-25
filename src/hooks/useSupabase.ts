@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Shipment, Checkpoint, ShipmentWithCheckpoints } from '../types/database';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { isMissingTrackingColumn, resolveShipmentReference, withLookupTimeout } from '../services/trackingService';
+import { resolveShipmentReference, withLookupTimeout } from '../services/trackingService';
 import { findDevShipment, subscribeDevData } from '../demo/devDataStore';
 
 // Hook to fetch all shipments for admin
@@ -110,10 +110,6 @@ export function useShipmentWithCheckpoints(reference: string) {
           .eq(target.column, target.value)
           .limit(1));
 
-        if (shipmentErr && target.column === 'tracking_number' && isMissingTrackingColumn(shipmentErr)) {
-          if (active) setNotFound(true);
-          return;
-        }
         if (shipmentErr) throw shipmentErr;
         const shipmentData = (rows as Shipment[] | null)?.[0];
         if (!active) return;

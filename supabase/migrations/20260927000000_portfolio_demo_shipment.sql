@@ -15,7 +15,6 @@ BEGIN
   SELECT id INTO v_admin
   FROM public.users
   WHERE user_type = 'admin'
-    AND id <> '00000000-0000-0000-0000-000000000000'::uuid
   ORDER BY created_at NULLS LAST, id
   LIMIT 1;
 

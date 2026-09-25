@@ -230,7 +230,7 @@ export const processNotificationEvents = async () => {
     const smtpUser = required('SMTP_USER');
     const smtpPassword = required('SMTP_APP_PASSWORD');
     const adminEmail = required('ADMIN_EMAIL');
-    const appName = process.env.APP_NAME?.trim() || 'Shipment Tracking Demo';
+    const appName = process.env.APP_NAME?.trim() || 'Shipment Tracking';
     // APP_URL always remains the canonical customer site. A test recipient is
     // inert unless an operator explicitly enables server-side test mode.
     const productionAppUrl = required('APP_URL');

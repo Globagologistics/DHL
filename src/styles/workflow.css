@@ -212,19 +212,19 @@ html.dhl-scroll-locked, html.dhl-scroll-locked body { overflow: hidden; overscro
 .dhl-inbox-card { overflow: hidden; }
 .dhl-inbox-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; padding: 14px 16px; border-bottom: 1px solid #edf0f1; }
 .dhl-inbox-controls .dhl-admin-list-search { flex: 1 1 280px; }
-.dhl-inbox-list { display: grid; }
-.dhl-inbox-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; padding: 14px 16px; border: 0; border-bottom: 1px solid #edf0f1; background: #fff; text-align: left; cursor: pointer; }
+.dhl-inbox-list { display: grid; grid-template-columns: minmax(0, 1fr); }
+.dhl-inbox-row { display: flex; align-items: flex-start; gap: 12px; width: 100%; min-width: 0; padding: 14px 16px; border: 0; border-bottom: 1px solid #edf0f1; background: #fff; text-align: left; cursor: pointer; }
 .dhl-inbox-row:hover { background: #fafbfb; }
 .dhl-inbox-row.active { background: #fff8e1; box-shadow: inset 3px 0 0 #ffcc00; }
 .dhl-inbox-avatar { display: grid; place-items: center; flex: 0 0 42px; width: 42px; height: 42px; border-radius: 50%; background: #191919; color: #ffcc00; font-size: 13px; font-weight: 850; }
-.dhl-inbox-main { display: grid; flex: 1; gap: 4px; min-width: 0; }
-.dhl-inbox-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.dhl-inbox-main { display: grid; grid-template-columns: minmax(0, 1fr); flex: 1; gap: 4px; min-width: 0; }
+.dhl-inbox-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
 .dhl-inbox-top strong { overflow: hidden; color: #1d1d1b; font-size: 14px; text-overflow: ellipsis; white-space: nowrap; }
 .dhl-inbox-top time { flex: 0 0 auto; color: #85898f; font-size: 11.5px; }
-.dhl-inbox-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: #3f4247; font-size: 12px; }
+.dhl-inbox-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; color: #3f4247; font-size: 12px; overflow-wrap: anywhere; }
 .dhl-inbox-meta .mono { letter-spacing: .04em; font-variant-numeric: tabular-nums; }
-.dhl-inbox-preview { display: flex; align-items: center; gap: 8px; }
-.dhl-inbox-preview small { flex: 1; overflow: hidden; color: #62656a; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
+.dhl-inbox-preview { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.dhl-inbox-preview small { flex: 1; min-width: 0; overflow: hidden; color: #62656a; font-size: 12.5px; text-overflow: ellipsis; white-space: nowrap; }
 .dhl-inbox-preview b { display: grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 99px; background: #d40511; color: #fff; font-size: 11px; }
 .dhl-inbox-row.unread .dhl-inbox-top strong, .dhl-inbox-row.unread .dhl-inbox-preview small { color: #1d1d1b; font-weight: 800; }
 .dhl-inbox-list.compact .dhl-inbox-row { padding: 11px 12px; }

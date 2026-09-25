@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Bell, ChevronRight, Headphones, Home, Menu, MoreHorizontal, Package, Search, Settings, ShieldQuestion, UserRound, X } from 'lucide-react';
 import { appConfig } from '../../../config/app';
-import { environment } from '../../../config/environment';
 import { TrackingNumberInput } from '../../../features/tracking/TrackingNumberInput';
 import { AUTO_LOOKUP_DEBOUNCE_MS } from '../../../features/tracking/useTrackingLookup';
 import { WhatsAppIcon, WhatsAppSupportButton } from '../../../features/whatsapp/WhatsAppSupport';
@@ -28,21 +27,6 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
-  const adminShortcut = useRef<{ count: number; timer: number | null }>({ count: 0, timer: null });
-  useEffect(() => () => { if (adminShortcut.current.timer !== null) window.clearTimeout(adminShortcut.current.timer); }, []);
-  const tapGuestIcon = () => {
-    if (!environment.enableAdminShortcut) return;
-    const state = adminShortcut.current;
-    if (state.count === 0) state.timer = window.setTimeout(() => { state.count = 0; state.timer = null; }, 5000);
-    state.count += 1;
-    if (state.count >= 10) {
-      if (state.timer !== null) window.clearTimeout(state.timer);
-      state.count = 0;
-      state.timer = null;
-      setDrawerOpen(false);
-      navigate('/admin');
-    }
-  };
   const isWelcome = location.pathname === '/';
   // The floating Support button would only link to the page already open.
   const hideFloatingSupport = isWelcome || location.pathname === '/chat';
@@ -75,7 +59,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
     <div className={`dhl-drawer-layer ${drawerOpen ? 'open' : ''}`} aria-hidden={!drawerOpen}>
       <button className="dhl-drawer-scrim" onClick={() => setDrawerOpen(false)} tabIndex={drawerOpen ? 0 : -1} aria-label="Close navigation"/>
       <aside className="dhl-drawer" aria-label="Navigation drawer"><div className="dhl-drawer-top"><BrandLogo/><button className="dhl-icon-button" onClick={() => setDrawerOpen(false)} aria-label="Close navigation"><X size={22}/></button></div>
-        <div className="dhl-drawer-guest"><button type="button" className="dhl-guest-avatar-button" onClick={tapGuestIcon} aria-label="Guest profile"><UserRound size={22}/></button><div><strong>Guest</strong><small>Track and manage your shipments</small></div></div>
+        <div className="dhl-drawer-guest"><span className="dhl-guest-avatar-button" aria-hidden="true"><UserRound size={22}/></span><div><strong>Guest</strong><small>Track and manage your shipments</small></div></div>
         <nav>
           {primaryLinks.map(({ label, path, icon: Icon }) => <Link key={label} to={path} onClick={() => setDrawerOpen(false)}><span className="dhl-drawer-link-icon"><Icon size={18}/></span><span>{label}</span><ChevronRight size={16}/></Link>)}
           <WhatsAppSupportButton trackingId={recentTrackingNumber()} className="dhl-drawer-whatsapp"><span className="dhl-drawer-link-icon whatsapp"><WhatsAppIcon size={18}/></span><span>WhatsApp Support</span><ChevronRight size={16}/></WhatsAppSupportButton>

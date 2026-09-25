@@ -6,16 +6,17 @@ import { TrackingErrorState, TrackingFoundState, TrackingNotFoundState, Tracking
 import { useTrackingLookup } from '../../features/tracking/useTrackingLookup';
 import type { TrackingPhase } from '../../features/tracking/useTrackingLookup';
 import { WhatsAppIcon, WhatsAppSupportButton } from '../../features/whatsapp/WhatsAppSupport';
+import { trackingCopy } from '../../features/tracking/trackingCopy';
 import { TRACKING_NUMBER_LENGTH, isShipmentRecordId } from '../../services/trackingService';
 
 /** Hands off to the result page after the "Shipment found" confirmation. */
 const FOUND_HOLD_MS = 650;
 
 const announcements: Partial<Record<TrackingPhase, string>> = {
-  searching: 'Searching for your shipment',
+  searching: trackingCopy.searching,
   found: 'Shipment found. Opening tracking details.',
-  not_found: 'Shipment not found',
-  error: 'We’re having trouble checking this shipment right now.',
+  not_found: trackingCopy.notFound.title,
+  error: trackingCopy.error.title,
 };
 
 // Autofocus only with a mouse/trackpad; on phones it would pop the keyboard over the hero.
@@ -46,11 +47,11 @@ export default function TrackShipmentSearch() {
   const editNumber = () => { lookup.reset(); window.setTimeout(() => { input.current?.focus(); input.current?.select(); }, 0); };
   const helperId = `${fieldId}-helper`;
   const helper = charWarning
-    ? { tone: 'error', text: 'Tracking numbers can contain numbers only.' }
+    ? { tone: 'error', text: trackingCopy.nonNumeric }
     : phase === 'incomplete'
-      ? { tone: 'error', text: 'Enter the complete 12-digit tracking number.' }
+      ? { tone: 'error', text: trackingCopy.submittedIncomplete }
       : phase === 'typing'
-        ? { tone: 'neutral', text: 'Tracking numbers contain 12 digits.' }
+        ? { tone: 'neutral', text: trackingCopy.incomplete }
         : phase === 'ready'
           ? { tone: 'ready', text: 'Checking automatically…' }
           : { tone: 'neutral', text: 'Find it on your receipt or shipment confirmation email.' };

@@ -21,7 +21,7 @@ export default defineConfig(({ command, mode }) => {
           'dhl-concept-logo.svg',
         ],
         manifest: {
-          name: 'Shipment Tracking Demo',
+          name: 'Shipment Tracking',
           short_name: 'Shipment Tracking',
           description: 'Track your package seamlessly, follow delivery progress, and access shipment support from one place.',
           theme_color: '#FFCC00',

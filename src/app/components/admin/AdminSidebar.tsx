@@ -1,6 +1,7 @@
 import { Link, NavLink, useLocation } from 'react-router-dom';
-import { BarChart3, Bell, ChevronDown, CircleHelp, LayoutDashboard, MessageCircle, Package, Plus, Settings, Truck, Users, UserRound, X } from 'lucide-react';
+import { ArrowLeft, BarChart3, Bell, ChevronDown, CircleHelp, LayoutDashboard, MessageCircle, Package, Plus, Settings, Truck, Users, UserRound, X } from 'lucide-react';
 import { useState } from 'react';
+import { appConfig } from '../../../config/app';
 import { brandConfig } from '../../../config/brand';
 import { supabase } from '../../../lib/supabase';
 
@@ -33,6 +34,10 @@ export default function AdminSidebar({ onNavigate, onClose, compact = false }: P
     <nav className="dhl-admin-navigation">
       {navigation.map(({ label, to, icon: Icon, exact }) => <NavLink key={to} to={to} onClick={onNavigate} className={() => activeFor(to, exact) ? 'active' : ''} aria-current={activeFor(to, exact) ? 'page' : undefined} title={label}><Icon size={18} strokeWidth={1.9} aria-hidden="true" /><span>{label}</span></NavLink>)}
     </nav>
+    {/* Leaves the console for the public site. The admin session is untouched. */}
+    <div className="dhl-admin-sidebar-exit-row">
+      <Link className="dhl-admin-sidebar-exit" to={appConfig.routes.welcome} onClick={onNavigate} title="Back to Landing Page"><ArrowLeft size={18} strokeWidth={1.9} aria-hidden="true" /><span>Back to Landing Page</span></Link>
+    </div>
     <div className="dhl-admin-sidebar-bottom">
       <Link className="dhl-admin-sidebar-help" to="/admin/settings" onClick={onNavigate}><CircleHelp size={18} /><span>Help & settings</span></Link>
       <button type="button" className="dhl-admin-profile" onClick={() => setProfileOpen(value => !value)} aria-expanded={profileOpen}><span className="dhl-admin-avatar"><UserRound size={19} /></span><span className="dhl-admin-profile-copy"><strong>Admin</strong><small>Administrator access</small></span><ChevronDown size={16} /></button>

@@ -6,10 +6,7 @@
 -- Do not run it on a project that already has these tables; apply new migrations instead.
 --
 -- Contents, in order:
---   sql_schema.sql
---   migrate_add_pickup_location.sql
---   add_missing_columns.sql
---   migrate_setup_storage_buckets.sql
+--   supabase/migrations/20260812000000_baseline.sql
 --   supabase/migrations/20260813000000_consignment_notifications.sql
 --   supabase/migrations/20260813000001_secure_chat_access.sql
 --   supabase/migrations/20260813000002_notification_reliability_and_lifecycle.sql
@@ -24,455 +21,214 @@
 --   supabase/migrations/20260925000002_app_settings.sql
 --   supabase/migrations/20260926000000_shipment_lifecycle.sql
 --   supabase/migrations/20260926000001_chat_message_deletion.sql
+--   supabase/migrations/20260927000000_portfolio_demo_shipment.sql
+--   supabase/migrations/20260927000001_remove_legacy_development_admin.sql
+--   supabase/migrations/20260927000002_secure_storage_policies.sql
 
 -- ===========================================================================
--- sql_schema.sql
+-- supabase/migrations/20260812000000_baseline.sql
 -- ===========================================================================
 
--- Buske Logistics Supabase Schema (Full)
--- Safe to run multiple times.
+-- Clean baseline for a new Supabase project.  This is the only foundational
+-- schema source; later migrations add workflow features and tighten policies.
+-- It deliberately contains no synthetic administrator or development data.
 
--- Extensions
-CREATE EXTENSION IF NOT EXISTS "pgcrypto";
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
--- Users
-CREATE TABLE IF NOT EXISTS public.users (
-  id UUID DEFAULT auth.uid() PRIMARY KEY,
-  email TEXT UNIQUE NOT NULL,
-  user_type TEXT NOT NULL CHECK (user_type IN ('admin', 'sender', 'receiver')),
-  full_name TEXT,
-  phone TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.users (
+  id uuid PRIMARY KEY DEFAULT auth.uid(),
+  email text UNIQUE NOT NULL,
+  user_type text NOT NULL CHECK (user_type IN ('admin', 'sender', 'receiver')),
+  full_name text,
+  phone text,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Shipments
-CREATE TABLE IF NOT EXISTS public.shipments (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  admin_id UUID NOT NULL REFERENCES public.users(id),
-  sender_name TEXT NOT NULL,
-  sender_phone TEXT NOT NULL,
-  sender_email TEXT,
-  receiver_name TEXT NOT NULL,
-  receiver_phone TEXT NOT NULL,
-  receiver_email TEXT,
-  pickup_location TEXT,
-  delivery_address TEXT NOT NULL,
-  warehouse TEXT,
-  transportation TEXT NOT NULL,
-  package_name TEXT,
-  images TEXT[] DEFAULT '{}',
-  cost NUMERIC(10, 2),
-  paid BOOLEAN DEFAULT FALSE,
-  vehicles_count INT,
-  vehicle_type TEXT,
-  driver_name TEXT,
-  driver_experience TEXT,
-  driver_image_url TEXT,
-  route_screenshot_url TEXT,
-  countdown_duration INT, -- seconds
-  countdown_start_time TIMESTAMP WITH TIME ZONE,
-  paused BOOLEAN DEFAULT FALSE,
-  pause_timestamp TIMESTAMP WITH TIME ZONE,
-  stopped BOOLEAN DEFAULT FALSE,
-  stop_reason TEXT,
-  stop_timestamp TIMESTAMP WITH TIME ZONE,
-  terminated BOOLEAN DEFAULT FALSE,
-  terminate_timestamp TIMESTAMP WITH TIME ZONE,
-  progress_bar_paused BOOLEAN DEFAULT FALSE,
-  current_checkpoint_index INT DEFAULT 0,
-  status TEXT DEFAULT 'in_transit' CHECK (status IN ('in_transit', 'paused', 'stopped', 'delivered')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.shipments (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  admin_id uuid NOT NULL REFERENCES public.users(id),
+  sender_name text NOT NULL,
+  sender_phone text NOT NULL,
+  sender_email text,
+  receiver_name text NOT NULL,
+  receiver_phone text NOT NULL,
+  receiver_email text,
+  pickup_location text,
+  delivery_address text NOT NULL,
+  warehouse text,
+  transportation text NOT NULL,
+  package_name text,
+  images text[] NOT NULL DEFAULT '{}',
+  cost numeric(10,2),
+  paid boolean NOT NULL DEFAULT false,
+  vehicles_count integer,
+  vehicle_type text,
+  driver_name text,
+  driver_experience text,
+  driver_image_url text,
+  route_screenshot_url text,
+  countdown_duration integer,
+  countdown_start_time timestamptz,
+  paused boolean NOT NULL DEFAULT false,
+  pause_timestamp timestamptz,
+  stopped boolean NOT NULL DEFAULT false,
+  stop_reason text,
+  stop_timestamp timestamptz,
+  terminated boolean NOT NULL DEFAULT false,
+  terminate_timestamp timestamptz,
+  progress_bar_paused boolean NOT NULL DEFAULT false,
+  current_checkpoint_index integer NOT NULL DEFAULT 0,
+  status text NOT NULL DEFAULT 'in_transit' CHECK (status IN ('in_transit', 'paused', 'stopped', 'delivered')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Checkpoints
-CREATE TABLE IF NOT EXISTS public.checkpoints (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  shipment_id UUID NOT NULL REFERENCES public.shipments(id) ON DELETE CASCADE,
-  location TEXT NOT NULL,
-  checkpoint_order INT NOT NULL,
-  status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'current', 'completed')),
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.checkpoints (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  shipment_id uuid NOT NULL REFERENCES public.shipments(id) ON DELETE CASCADE,
+  location text NOT NULL,
+  checkpoint_order integer NOT NULL,
+  status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'current', 'completed')),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
--- Chat Threads
-CREATE TABLE IF NOT EXISTS public.chat_threads (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tracking_id UUID NOT NULL REFERENCES public.shipments(id) ON DELETE CASCADE,
-  last_message_at TIMESTAMP WITH TIME ZONE,
-  last_message_preview TEXT,
-  last_message_sender TEXT CHECK (last_message_sender IN ('user', 'admin')),
-  unread_for_admin INT DEFAULT 0,
-  unread_for_user INT DEFAULT 0,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE public.chat_threads (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  tracking_id uuid NOT NULL REFERENCES public.shipments(id) ON DELETE CASCADE,
+  last_message_at timestamptz,
+  last_message_preview text,
+  last_message_sender text CHECK (last_message_sender IN ('user', 'admin')),
+  unread_for_admin integer NOT NULL DEFAULT 0,
+  unread_for_user integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS idx_chat_threads_tracking_id ON public.chat_threads(tracking_id);
+CREATE UNIQUE INDEX idx_chat_threads_tracking_id ON public.chat_threads(tracking_id);
 
--- Chat Messages
-CREATE TABLE IF NOT EXISTS public.chat_messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  thread_id UUID NOT NULL REFERENCES public.chat_threads(id) ON DELETE CASCADE,
-  tracking_id UUID NOT NULL REFERENCES public.shipments(id) ON DELETE CASCADE,
-  sender_role TEXT NOT NULL CHECK (sender_role IN ('user', 'admin')),
-  sender_name TEXT,
-  sender_avatar_url TEXT,
-  text TEXT,
-  media JSONB DEFAULT '[]'::jsonb,
-  animate_typing BOOLEAN DEFAULT FALSE,
-  typing_speed_ms INT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+CREATE TABLE public.chat_messages (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id uuid NOT NULL REFERENCES public.chat_threads(id) ON DELETE CASCADE,
+  tracking_id uuid NOT NULL REFERENCES public.shipments(id) ON DELETE CASCADE,
+  sender_role text NOT NULL CHECK (sender_role IN ('user', 'admin')),
+  sender_name text,
+  sender_avatar_url text,
+  text text,
+  media jsonb NOT NULL DEFAULT '[]'::jsonb,
+  animate_typing boolean NOT NULL DEFAULT false,
+  typing_speed_ms integer,
+  created_at timestamptz NOT NULL DEFAULT now(),
   CONSTRAINT chat_message_has_content CHECK (
     (text IS NOT NULL AND length(trim(text)) > 0)
-    OR (media IS NOT NULL AND jsonb_array_length(media) > 0)
+    OR jsonb_array_length(media) > 0
   )
 );
 
--- Indexes
-CREATE INDEX IF NOT EXISTS idx_shipments_admin_id ON public.shipments(admin_id);
-CREATE INDEX IF NOT EXISTS idx_shipments_sender_email ON public.shipments(sender_email);
-CREATE INDEX IF NOT EXISTS idx_shipments_receiver_email ON public.shipments(receiver_email);
-CREATE INDEX IF NOT EXISTS idx_shipments_created_at ON public.shipments(created_at);
-CREATE INDEX IF NOT EXISTS idx_checkpoints_shipment_id ON public.checkpoints(shipment_id);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_tracking_id ON public.chat_messages(tracking_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_chat_messages_thread_id ON public.chat_messages(thread_id, created_at);
+CREATE INDEX idx_shipments_admin_id ON public.shipments(admin_id);
+CREATE INDEX idx_shipments_sender_email ON public.shipments(sender_email);
+CREATE INDEX idx_shipments_receiver_email ON public.shipments(receiver_email);
+CREATE INDEX idx_shipments_created_at ON public.shipments(created_at);
+CREATE INDEX idx_checkpoints_shipment_id ON public.checkpoints(shipment_id);
+CREATE INDEX idx_chat_messages_tracking_id ON public.chat_messages(tracking_id, created_at);
+CREATE INDEX idx_chat_messages_thread_id ON public.chat_messages(thread_id, created_at);
 
--- Updated_at helper
 CREATE OR REPLACE FUNCTION public.set_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-  NEW.updated_at = NOW();
+  NEW.updated_at = now();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
--- Ensure terminated shipments are stopped
 CREATE OR REPLACE FUNCTION public.enforce_terminated_stopped()
-RETURNS TRIGGER AS $$
+RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
   IF NEW.terminated THEN
-    NEW.stopped := TRUE;
-    IF NEW.stop_timestamp IS NULL THEN
-      NEW.stop_timestamp := NOW();
-    END IF;
-    IF NEW.status IS NULL OR NEW.status <> 'stopped' THEN
-      NEW.status := 'stopped';
-    END IF;
+    NEW.stopped := true;
+    NEW.stop_timestamp := coalesce(NEW.stop_timestamp, now());
+    NEW.status := 'stopped';
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
--- Chat thread updater on new message
 CREATE OR REPLACE FUNCTION public.update_chat_thread_on_message()
-RETURNS TRIGGER AS $$
-DECLARE
-  preview TEXT;
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE preview text;
 BEGIN
-  IF NEW.text IS NOT NULL AND length(trim(NEW.text)) > 0 THEN
-    preview := left(trim(NEW.text), 160);
-  ELSIF NEW.media IS NOT NULL AND jsonb_array_length(NEW.media) > 0 THEN
-    preview := 'Media attachment';
-  ELSE
-    preview := NULL;
-  END IF;
-
+  preview := CASE
+    WHEN NEW.text IS NOT NULL AND length(trim(NEW.text)) > 0 THEN left(trim(NEW.text), 160)
+    WHEN jsonb_array_length(NEW.media) > 0 THEN 'Media attachment'
+  END;
   UPDATE public.chat_threads
-  SET updated_at = NOW(),
-      last_message_at = NEW.created_at,
-      last_message_sender = NEW.sender_role,
-      last_message_preview = preview,
+  SET updated_at = now(), last_message_at = NEW.created_at,
+      last_message_sender = NEW.sender_role, last_message_preview = preview,
       unread_for_admin = CASE WHEN NEW.sender_role = 'user' THEN unread_for_admin + 1 ELSE unread_for_admin END,
       unread_for_user = CASE WHEN NEW.sender_role = 'admin' THEN unread_for_user + 1 ELSE unread_for_user END
   WHERE id = NEW.thread_id;
-
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
--- Triggers
-DROP TRIGGER IF EXISTS set_users_updated_at ON public.users;
-CREATE TRIGGER set_users_updated_at
-BEFORE UPDATE ON public.users
-FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_users_updated_at BEFORE UPDATE ON public.users
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_shipments_updated_at BEFORE UPDATE ON public.shipments
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_checkpoints_updated_at BEFORE UPDATE ON public.checkpoints
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER set_chat_threads_updated_at BEFORE UPDATE ON public.chat_threads
+  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+CREATE TRIGGER enforce_terminated_stopped_trigger BEFORE INSERT OR UPDATE ON public.shipments
+  FOR EACH ROW EXECUTE FUNCTION public.enforce_terminated_stopped();
+CREATE TRIGGER chat_message_insert_trigger AFTER INSERT ON public.chat_messages
+  FOR EACH ROW EXECUTE FUNCTION public.update_chat_thread_on_message();
 
-DROP TRIGGER IF EXISTS set_shipments_updated_at ON public.shipments;
-CREATE TRIGGER set_shipments_updated_at
-BEFORE UPDATE ON public.shipments
-FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-DROP TRIGGER IF EXISTS set_checkpoints_updated_at ON public.checkpoints;
-CREATE TRIGGER set_checkpoints_updated_at
-BEFORE UPDATE ON public.checkpoints
-FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-DROP TRIGGER IF EXISTS set_chat_threads_updated_at ON public.chat_threads;
-CREATE TRIGGER set_chat_threads_updated_at
-BEFORE UPDATE ON public.chat_threads
-FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
-
-DROP TRIGGER IF EXISTS enforce_terminated_stopped_trigger ON public.shipments;
-CREATE TRIGGER enforce_terminated_stopped_trigger
-BEFORE INSERT OR UPDATE ON public.shipments
-FOR EACH ROW EXECUTE FUNCTION public.enforce_terminated_stopped();
-
-DROP TRIGGER IF EXISTS chat_message_insert_trigger ON public.chat_messages;
-CREATE TRIGGER chat_message_insert_trigger
-AFTER INSERT ON public.chat_messages
-FOR EACH ROW EXECUTE FUNCTION public.update_chat_thread_on_message();
-
--- Enable RLS
 ALTER TABLE public.users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.shipments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.checkpoints ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_threads ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.chat_messages ENABLE ROW LEVEL SECURITY;
 
--- Users policies (basic)
-DROP POLICY IF EXISTS "Users can view their own data" ON public.users;
-CREATE POLICY "Users can view their own data" ON public.users
-  FOR SELECT USING (auth.uid() = id);
+-- The initial baseline grants no browser access.  The security migrations that
+-- follow define public tracking, admin, and authenticated-chat access.
+CREATE POLICY "Users can view their own data" ON public.users FOR SELECT TO authenticated USING (auth.uid() = id);
+CREATE POLICY "Users can update their own data" ON public.users FOR UPDATE TO authenticated USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can insert themselves" ON public.users FOR INSERT TO authenticated WITH CHECK (auth.uid() = id);
 
-DROP POLICY IF EXISTS "Users can update their own data" ON public.users;
-CREATE POLICY "Users can update their own data" ON public.users
-  FOR UPDATE USING (auth.uid() = id);
+-- Storage buckets are created here, but object policies are intentionally
+-- deferred until the complete security model is available in a later migration.
+INSERT INTO storage.buckets (id, name, public) VALUES
+  ('shipment-images', 'shipment-images', true),
+  ('driver-images', 'driver-images', true),
+  ('route-screenshots', 'route-screenshots', true),
+  ('chat-media', 'chat-media', false)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
 
-DROP POLICY IF EXISTS "Users can insert themselves" ON public.users;
-CREATE POLICY "Users can insert themselves" ON public.users
-  FOR INSERT WITH CHECK (auth.uid() = id);
-
--- Permissive shipment policies for development (tighten for production)
-DROP POLICY IF EXISTS "Allow shipment creation" ON public.shipments;
-CREATE POLICY "Allow shipment creation" ON public.shipments
-  FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow shipment viewing" ON public.shipments;
-CREATE POLICY "Allow shipment viewing" ON public.shipments
-  FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow shipment updates" ON public.shipments;
-CREATE POLICY "Allow shipment updates" ON public.shipments
-  FOR UPDATE USING (true);
-
-DROP POLICY IF EXISTS "Allow shipment deletion" ON public.shipments;
-CREATE POLICY "Allow shipment deletion" ON public.shipments
-  FOR DELETE USING (true);
-
--- Checkpoints policies
-DROP POLICY IF EXISTS "Allow checkpoint viewing" ON public.checkpoints;
-CREATE POLICY "Allow checkpoint viewing" ON public.checkpoints
-  FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow checkpoint creation" ON public.checkpoints;
-CREATE POLICY "Allow checkpoint creation" ON public.checkpoints
-  FOR INSERT WITH CHECK (true);
-
--- Chat policies (permissive for now)
-DROP POLICY IF EXISTS "Allow chat thread read" ON public.chat_threads;
-CREATE POLICY "Allow chat thread read" ON public.chat_threads
-  FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow chat thread write" ON public.chat_threads;
-CREATE POLICY "Allow chat thread write" ON public.chat_threads
-  FOR INSERT WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Allow chat thread update" ON public.chat_threads;
-CREATE POLICY "Allow chat thread update" ON public.chat_threads
-  FOR UPDATE USING (true);
-
-DROP POLICY IF EXISTS "Allow chat message read" ON public.chat_messages;
-CREATE POLICY "Allow chat message read" ON public.chat_messages
-  FOR SELECT USING (true);
-
-DROP POLICY IF EXISTS "Allow chat message write" ON public.chat_messages;
-CREATE POLICY "Allow chat message write" ON public.chat_messages
-  FOR INSERT WITH CHECK (true);
-
--- Storage buckets + policies (guarded)
 DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.tables
-    WHERE table_schema = 'storage'
-      AND table_name = 'buckets'
-  ) THEN
-    INSERT INTO storage.buckets (id, name, public)
-    VALUES
-      ('shipment-images', 'shipment-images', true),
-      ('driver-images', 'driver-images', true),
-      ('route-screenshots', 'route-screenshots', true),
-      ('chat-media', 'chat-media', true)
-    ON CONFLICT (id) DO UPDATE
-      SET public = EXCLUDED.public;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.tables
-    WHERE table_schema = 'storage'
-      AND table_name = 'objects'
-  ) THEN
-    -- Storage policies (public buckets for development)
-    DROP POLICY IF EXISTS "Public bucket read" ON storage.objects;
-    CREATE POLICY "Public bucket read" ON storage.objects
-      FOR SELECT
-      TO anon, authenticated
-      USING (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-
-    DROP POLICY IF EXISTS "Public bucket insert" ON storage.objects;
-    CREATE POLICY "Public bucket insert" ON storage.objects
-      FOR INSERT
-      TO anon, authenticated
-      WITH CHECK (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-
-    DROP POLICY IF EXISTS "Public bucket update" ON storage.objects;
-    CREATE POLICY "Public bucket update" ON storage.objects
-      FOR UPDATE
-      TO anon, authenticated
-      USING (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'))
-      WITH CHECK (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-
-    DROP POLICY IF EXISTS "Public bucket delete" ON storage.objects;
-    CREATE POLICY "Public bucket delete" ON storage.objects
-      FOR DELETE
-      TO anon, authenticated
-      USING (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-  END IF;
-END $$;
-
--- Realtime publication (safe add)
-DO $$
-DECLARE
-  t TEXT;
+DECLARE t text;
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
     FOREACH t IN ARRAY ARRAY['shipments', 'checkpoints', 'chat_threads', 'chat_messages'] LOOP
       IF NOT EXISTS (
-        SELECT 1
-        FROM pg_publication_rel pr
+        SELECT 1 FROM pg_publication_rel pr
         JOIN pg_class c ON c.oid = pr.prrelid
         JOIN pg_namespace n ON n.oid = c.relnamespace
         JOIN pg_publication p ON p.oid = pr.prpubid
-        WHERE p.pubname = 'supabase_realtime'
-          AND n.nspname = 'public'
-          AND c.relname = t
+        WHERE p.pubname = 'supabase_realtime' AND n.nspname = 'public' AND c.relname = t
       ) THEN
         EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
       END IF;
     END LOOP;
   END IF;
-END $$;
+END;
+$$;
 
--- Replica identity for full change payloads
 ALTER TABLE public.shipments REPLICA IDENTITY FULL;
 ALTER TABLE public.checkpoints REPLICA IDENTITY FULL;
 ALTER TABLE public.chat_threads REPLICA IDENTITY FULL;
 ALTER TABLE public.chat_messages REPLICA IDENTITY FULL;
-
--- ===========================================================================
--- migrate_add_pickup_location.sql
--- ===========================================================================
-
--- Migration: Add pickup_location column to shipments table
--- This adds the missing pickup_location column that the app is trying to insert
-
-ALTER TABLE public.shipments 
-ADD COLUMN IF NOT EXISTS pickup_location TEXT;
-
--- Optional: Add index for faster queries if needed
--- CREATE INDEX IF NOT EXISTS idx_shipments_pickup_location ON public.shipments(pickup_location);
-
--- ===========================================================================
--- add_missing_columns.sql
--- ===========================================================================
-
--- Migration: Add missing columns to shipments table
--- Run this in Supabase SQL Editor to fix the pause button error
-
--- Add stop_timestamp column if it doesn't exist
-ALTER TABLE public.shipments
-ADD COLUMN IF NOT EXISTS stop_timestamp TIMESTAMP WITH TIME ZONE;
-
--- Add terminated column for shipment termination feature
-ALTER TABLE public.shipments
-ADD COLUMN IF NOT EXISTS terminated BOOLEAN DEFAULT FALSE;
-
--- Add terminate_timestamp to track when shipment was terminated
-ALTER TABLE public.shipments
-ADD COLUMN IF NOT EXISTS terminate_timestamp TIMESTAMP WITH TIME ZONE;
-
--- Add progress_bar_paused column for pause/play toggle
-ALTER TABLE public.shipments
-ADD COLUMN IF NOT EXISTS progress_bar_paused BOOLEAN DEFAULT FALSE;
-
--- Verify columns were added
-SELECT column_name, data_type, column_default
-FROM information_schema.columns
-WHERE table_name = 'shipments'
-AND column_name IN ('stop_timestamp', 'terminated', 'terminate_timestamp', 'progress_bar_paused')
-ORDER BY column_name;
-
--- ===========================================================================
--- migrate_setup_storage_buckets.sql
--- ===========================================================================
-
--- Run this in the Supabase SQL editor if product image uploads fail.
--- It creates/updates the public storage buckets used by the app and permits uploads.
-
-DO $$
-BEGIN
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.tables
-    WHERE table_schema = 'storage'
-      AND table_name = 'buckets'
-  ) THEN
-    INSERT INTO storage.buckets (id, name, public)
-    VALUES
-      ('shipment-images', 'shipment-images', true),
-      ('driver-images', 'driver-images', true),
-      ('route-screenshots', 'route-screenshots', true),
-      ('chat-media', 'chat-media', true)
-    ON CONFLICT (id) DO UPDATE
-      SET public = EXCLUDED.public;
-  END IF;
-
-  IF EXISTS (
-    SELECT 1
-    FROM information_schema.tables
-    WHERE table_schema = 'storage'
-      AND table_name = 'objects'
-  ) THEN
-    DROP POLICY IF EXISTS "Public bucket read" ON storage.objects;
-    CREATE POLICY "Public bucket read" ON storage.objects
-      FOR SELECT
-      TO anon, authenticated
-      USING (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-
-    DROP POLICY IF EXISTS "Public bucket insert" ON storage.objects;
-    CREATE POLICY "Public bucket insert" ON storage.objects
-      FOR INSERT
-      TO anon, authenticated
-      WITH CHECK (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-
-    DROP POLICY IF EXISTS "Public bucket update" ON storage.objects;
-    CREATE POLICY "Public bucket update" ON storage.objects
-      FOR UPDATE
-      TO anon, authenticated
-      USING (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'))
-      WITH CHECK (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-
-    DROP POLICY IF EXISTS "Public bucket delete" ON storage.objects;
-    CREATE POLICY "Public bucket delete" ON storage.objects
-      FOR DELETE
-      TO anon, authenticated
-      USING (bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots', 'chat-media'));
-  END IF;
-END $$;
 
 -- ===========================================================================
 -- supabase/migrations/20260813000000_consignment_notifications.sql
@@ -2108,3 +1864,131 @@ END;
 $$;
 REVOKE ALL ON FUNCTION public.delete_support_message(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.delete_support_message(uuid) TO authenticated;
+
+-- ===========================================================================
+-- supabase/migrations/20260927000000_portfolio_demo_shipment.sql
+-- ===========================================================================
+
+-- Permanent, synthetic portfolio shipment. This migration never creates an
+-- administrator: it reuses the first real admin profile when one exists.
+-- If the owner has not provisioned an admin yet, it safely waits until the
+-- deployment checklist's explicit admin-provisioning step is complete.
+
+ALTER TABLE public.shipments ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false;
+CREATE INDEX IF NOT EXISTS shipments_demo_tracking_idx ON public.shipments (tracking_number) WHERE is_demo;
+
+DO $$
+DECLARE
+  v_admin uuid;
+  v_shipment uuid;
+  v_now timestamptz := now();
+BEGIN
+  SELECT id INTO v_admin
+  FROM public.users
+  WHERE user_type = 'admin'
+  ORDER BY created_at NULLS LAST, id
+  LIMIT 1;
+
+  -- No fake/default account is created. Rerun after a real admin exists.
+  IF v_admin IS NULL THEN RETURN; END IF;
+
+  SELECT id INTO v_shipment FROM public.shipments WHERE tracking_number = '010101010101' LIMIT 1;
+  IF v_shipment IS NULL THEN
+    INSERT INTO public.shipments (
+      admin_id, sender_name, sender_phone, sender_email, receiver_name, receiver_phone, receiver_email,
+      pickup_location, delivery_address, transportation, package_name, images, cost, paid,
+      status, is_published, published_at, tracking_number, is_demo,
+      lifecycle_state, lifecycle_events, currency, payment_status, payment_responsibility,
+      estimated_delivery_at, origin_lat, origin_lng, destination_lat, destination_lng,
+      origin_location_label, destination_location_label, current_checkpoint_index
+    ) VALUES (
+      v_admin, 'Olivia Reed', '+1 212 555 0132', 'olivia.reed@example.invalid', 'Daniel Carter', '+1 213 555 0148', 'daniel.carter@example.invalid',
+      'New York City, New York, United States', 'Los Angeles, California, United States', 'Air Freight', 'Portfolio demonstration package',
+      ARRAY[]::text[], 0, true, 'in_transit', true, v_now - interval '1 day', '010101010101', true,
+      'in_transit', jsonb_build_array(jsonb_build_object('kind','created','title','Synthetic portfolio shipment created','at',v_now - interval '2 days')),
+      'USD', 'paid', 'sender', v_now + interval '1 day',
+      40.714, -74.006, 34.052, -118.244,
+      'New York City, New York, United States', 'Los Angeles, California, United States', 2
+    ) RETURNING id INTO v_shipment;
+
+    INSERT INTO public.checkpoints (shipment_id, location, checkpoint_order, status, created_at, updated_at)
+    VALUES
+      (v_shipment, 'New York, NY · Processed at origin facility', 1, 'completed', v_now - interval '30 hours', v_now - interval '30 hours'),
+      (v_shipment, 'Louisville, KY · Arrived at transit hub', 2, 'completed', v_now - interval '14 hours', v_now - interval '14 hours'),
+      (v_shipment, 'Los Angeles, CA · Processed at destination facility', 3, 'current', v_now - interval '3 hours', v_now - interval '3 hours'),
+      (v_shipment, 'Los Angeles, CA · Out for delivery', 4, 'pending', v_now + interval '6 hours', v_now + interval '6 hours');
+  ELSE
+    UPDATE public.shipments SET is_demo = true WHERE id = v_shipment;
+  END IF;
+END $$;
+
+COMMENT ON COLUMN public.shipments.is_demo IS 'Synthetic portfolio data: external customer delivery must be suppressed.';
+
+-- ===========================================================================
+-- supabase/migrations/20260927000001_remove_legacy_development_admin.sql
+-- ===========================================================================
+
+-- Intentionally retained as a no-op historical marker. The clean baseline
+-- never inserts a development administrator, so production migrations contain
+-- no synthetic account identifiers or cleanup side effects.
+
+-- ===========================================================================
+-- supabase/migrations/20260927000002_secure_storage_policies.sql
+-- ===========================================================================
+
+-- Storage is public only where assets are deliberately customer-visible.
+-- Uploads are never generally available to anon/authenticated roles.
+
+INSERT INTO storage.buckets (id, name, public) VALUES
+  ('shipment-images', 'shipment-images', true),
+  ('driver-images', 'driver-images', true),
+  ('route-screenshots', 'route-screenshots', true),
+  ('chat-media', 'chat-media', false)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+
+DROP POLICY IF EXISTS "Public bucket read" ON storage.objects;
+DROP POLICY IF EXISTS "Public bucket insert" ON storage.objects;
+DROP POLICY IF EXISTS "Public bucket update" ON storage.objects;
+DROP POLICY IF EXISTS "Public bucket delete" ON storage.objects;
+DROP POLICY IF EXISTS "Admins can upload operational media" ON storage.objects;
+DROP POLICY IF EXISTS "Public request images can be uploaded" ON storage.objects;
+DROP POLICY IF EXISTS "Chat participants can read chat media" ON storage.objects;
+DROP POLICY IF EXISTS "Chat participants can upload chat media" ON storage.objects;
+
+CREATE POLICY "Admins can upload operational media"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots')
+  AND public.current_user_is_admin()
+  AND lower(coalesce(metadata ->> 'mimetype', '')) IN ('image/jpeg', 'image/png', 'image/webp')
+  AND coalesce(nullif(metadata ->> 'size', '')::bigint, 0) BETWEEN 1 AND 10485760
+);
+
+CREATE POLICY "Public request images can be uploaded"
+ON storage.objects FOR INSERT TO anon, authenticated
+WITH CHECK (
+  bucket_id = 'shipment-images'
+  AND (storage.foldername(name))[1] = 'requests'
+  AND lower(coalesce(metadata ->> 'mimetype', '')) IN ('image/jpeg', 'image/png', 'image/webp')
+  AND coalesce(nullif(metadata ->> 'size', '')::bigint, 0) BETWEEN 1 AND 10485760
+);
+
+-- Private chat attachments are stored below <shipment-uuid>/ and are readable
+-- only by the admin or authenticated shipment participant.
+CREATE POLICY "Chat participants can read chat media"
+ON storage.objects FOR SELECT TO authenticated
+USING (
+  bucket_id = 'chat-media'
+  AND name ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/'
+  AND public.current_user_can_access_chat((storage.foldername(name))[1]::uuid)
+);
+
+CREATE POLICY "Chat participants can upload chat media"
+ON storage.objects FOR INSERT TO authenticated
+WITH CHECK (
+  bucket_id = 'chat-media'
+  AND name ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/'
+  AND public.current_user_can_access_chat((storage.foldername(name))[1]::uuid)
+  AND lower(coalesce(metadata ->> 'mimetype', '')) IN ('image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm')
+  AND coalesce(nullif(metadata ->> 'size', '')::bigint, 0) BETWEEN 1 AND 10485760
+);
