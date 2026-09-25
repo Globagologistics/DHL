@@ -61,7 +61,7 @@ They are server-only; none may be prefixed with `VITE_`.
 | `SMTP_USER` | The Gmail/Google Workspace address used to send mail. |
 | `SMTP_APP_PASSWORD` | A Google App Password generated for that Gmail account. |
 | `ADMIN_EMAIL` | The private operations/admin notification inbox. |
-| `APP_NAME` | The customer-facing company/app name. |
+| `APP_NAME` | `Shipment Tracking Demo` for the neutral public deployment identity. |
 | `APP_URL` | The neutral production site origin, for example `https://shipment-tracking-demo.example`. |
 | `SUPABASE_URL` | Your Supabase project URL (non-`VITE_` copy for the server). |
 | `SUPABASE_SECRET_KEY` | A current Supabase `sb_secret_...` key; Netlify only, never frontend. |
@@ -71,7 +71,7 @@ They are server-only; none may be prefixed with `VITE_`.
 | `SMTP_SECURE` | `true` for port 465. |
 | `SUPPORT_URL` | The secure customer support route, for example `https://shipment-tracking-demo.example/chat`. |
 | `LOGO_URL` | An optional neutral publicly hosted icon. Leave blank when no neutral public image is configured. |
-| `LOCAL_APP_URL` | `http://localhost:5173`; used only for email tests redirected via `EMAIL_TEST_RECIPIENT`. |
+| `LOCAL_APP_URL` | `http://localhost:5194`; used only for email tests redirected via `EMAIL_TEST_RECIPIENT`. |
 | `EMAIL_LINK_BASE_URL` | Optional staging/test CTA override; leave blank for normal production behavior. |
 | `EMAIL_TEST_RECIPIENT` | Optional safe test inbox; when present all email is redirected there and marked `[TEST]`. Remove before production. |
 
