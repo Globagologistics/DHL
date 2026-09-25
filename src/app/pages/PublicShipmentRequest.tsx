@@ -6,8 +6,8 @@ import { submitShipmentRequest } from '../../services/shipmentRequestService';
 
 /**
  * Shareable public form (/shipment-request/new). Customers describe the
- * shipment; operational details (carrier, delivery estimate, payment) are set
- * by the admin during review. Submitting never creates a live shipment.
+ * shipment. The customer supplies the same shipment-information fields as
+ * the admin; submitting never creates a live shipment or grants lifecycle access.
  */
 export default function PublicShipmentRequest() {
   const [submitting, setSubmitting] = useState(false);

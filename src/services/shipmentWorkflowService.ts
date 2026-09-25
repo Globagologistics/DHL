@@ -112,14 +112,20 @@ async function toCompactDataUrl(file: File, maxSize = 1280): Promise<string> {
  */
 export async function storePackagePhotos(photos: PackagePhoto[], folder: string, development: boolean): Promise<string[]> {
   const urls: string[] = [];
-  for (const photo of photos) {
-    if (!photo.file) { urls.push(photo.url); continue; }
-    if (development) { urls.push(await toCompactDataUrl(photo.file)); continue; }
-    const { url, error } = await uploadImage('shipment-images', photo.file, folder);
-    if (error || !url) throw new Error(`“${photo.file.name}” could not be uploaded. Please try again.`);
-    urls.push(url);
+  const uploadedPaths: string[] = [];
+  try {
+    for (const photo of photos) {
+      if (!photo.file) { urls.push(photo.url); continue; }
+      if (development) { urls.push(await toCompactDataUrl(photo.file)); continue; }
+      const { url, path, error } = await uploadImage('shipment-images', photo.file, folder);
+      if (error || !url || !path) throw new Error(`“${photo.file.name}” could not be uploaded. Please try again.`);
+      uploadedPaths.push(path); urls.push(url);
+    }
+    return urls;
+  } catch (cause) {
+    if (!development && uploadedPaths.length) await supabase.storage.from('shipment-images').remove(uploadedPaths);
+    throw cause;
   }
-  return urls;
 }
 
 /** Creates a SCHEDULED shipment. Nothing is published or moving yet. */

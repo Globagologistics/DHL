@@ -6,6 +6,7 @@ import { TrackingNumberInput } from '../../../features/tracking/TrackingNumberIn
 import { AUTO_LOOKUP_DEBOUNCE_MS } from '../../../features/tracking/useTrackingLookup';
 import { WhatsAppIcon, WhatsAppSupportButton } from '../../../features/whatsapp/WhatsAppSupport';
 import { TRACKING_NUMBER_LENGTH, recentTrackingNumber } from '../../../services/trackingService';
+import { languages, useI18n } from '../../../i18n';
 
 const primaryLinks = [
   { label: 'Home', path: '/home', icon: Home },
@@ -24,6 +25,7 @@ export function BrandLogo({ unboxed = false }: { unboxed?: boolean }) {
 }
 
 export function CustomerShell({ children }: { children: React.ReactNode }) {
+  const { language, setLanguage, t } = useI18n();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -59,13 +61,14 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
     <div className={`dhl-drawer-layer ${drawerOpen ? 'open' : ''}`} aria-hidden={!drawerOpen}>
       <button className="dhl-drawer-scrim" onClick={() => setDrawerOpen(false)} tabIndex={drawerOpen ? 0 : -1} aria-label="Close navigation"/>
       <aside className="dhl-drawer" aria-label="Navigation drawer"><div className="dhl-drawer-top"><BrandLogo/><button className="dhl-icon-button" onClick={() => setDrawerOpen(false)} aria-label="Close navigation"><X size={22}/></button></div>
-        <div className="dhl-drawer-guest"><span className="dhl-guest-avatar-button" aria-hidden="true"><UserRound size={22}/></span><div><strong>Guest</strong><small>Track and manage your shipments</small></div></div>
+        <div className="dhl-drawer-guest"><span className="dhl-guest-avatar-button" aria-hidden="true"><UserRound size={22}/></span><div><strong>{t('guest')}</strong><small>{t('guestHint')}</small></div></div>
         <nav>
           {primaryLinks.map(({ label, path, icon: Icon }) => <Link key={label} to={path} onClick={() => setDrawerOpen(false)}><span className="dhl-drawer-link-icon"><Icon size={18}/></span><span>{label}</span><ChevronRight size={16}/></Link>)}
-          <WhatsAppSupportButton trackingId={recentTrackingNumber()} className="dhl-drawer-whatsapp"><span className="dhl-drawer-link-icon whatsapp"><WhatsAppIcon size={18}/></span><span>WhatsApp Support</span><ChevronRight size={16}/></WhatsAppSupportButton>
+          <WhatsAppSupportButton trackingId={recentTrackingNumber()} className="dhl-drawer-whatsapp"><span className="dhl-drawer-link-icon whatsapp"><WhatsAppIcon size={18}/></span><span>{t('whatsapp')}</span><ChevronRight size={16}/></WhatsAppSupportButton>
           {secondaryLinks.map(({ label, path, icon: Icon }) => <Link key={label} to={path} onClick={() => setDrawerOpen(false)}><span className="dhl-drawer-link-icon"><Icon size={18}/></span><span>{label}</span><ChevronRight size={16}/></Link>)}
         </nav>
-        <Link className="dhl-drawer-signin" to="/signin" onClick={() => setDrawerOpen(false)}><UserRound size={18}/> Sign in</Link>
+        <label className="dhl-drawer-language"><span>{t('language')}</span><select value={language} onChange={event => setLanguage(event.target.value as typeof language)} aria-label={t('language')}>{languages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
+        <Link className="dhl-drawer-signin" to="/signin" onClick={() => setDrawerOpen(false)}><UserRound size={18}/> {t('signIn')}</Link>
       </aside>
     </div>
   </div>;

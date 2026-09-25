@@ -6,7 +6,9 @@ import { RoutePicker } from '../map/RoutePicker';
 import { RouteMap } from '../map/RouteMap';
 import { RouteLocationField } from '../map/LocationFields';
 import { formatDistance, pathLengthKm } from '../map/geo';
-import { carrierRoles, currencies, defaultCarrierRole, emptyShipmentDraft, paymentLabels, transportMethods } from '../shipments/types';
+import { carrierRoles, defaultCarrierRole, emptyShipmentDraft, paymentLabels, transportMethods } from '../shipments/types';
+import { currencies, formatCurrency, isSupportedCurrency } from '../../data/currencies';
+import { useI18n } from '../../i18n';
 import type { PaymentChoice, ShipmentDraft, TransportMethod } from '../shipments/types';
 import type { PackagePhoto } from '../../services/shipmentWorkflowService';
 
@@ -49,10 +51,9 @@ function readDraft(key?: string): ShipmentDraft | null {
 }
 
 export default function ShipmentWizard({ mode, initial, initialPhotos = [], submitLabel, onSubmit, submitting, submitError, draftKey, reviewFooter, startStep = 0 }: Props) {
+  const { locale } = useI18n();
   const isAdmin = mode === 'admin';
-  const steps = isAdmin
-    ? [{ title: 'Sender', intro: 'Who is sending this shipment?' }, { title: 'Receiver', intro: 'Who will receive it, and where?' }, { title: 'Consignment', intro: 'What is being shipped?' }, { title: 'Carrier & Delivery', intro: 'How it travels and when it should arrive.' }, { title: 'Review', intro: 'Check everything before creating the shipment.' }]
-    : [{ title: 'Sender', intro: 'Who is sending this shipment?' }, { title: 'Receiver', intro: 'Who will receive it, and where?' }, { title: 'Package', intro: 'Tell us what you are sending.' }, { title: 'Review', intro: 'Check your details before submitting.' }];
+  const steps = [{ title: 'Sender', intro: 'Who is sending this shipment?' }, { title: 'Receiver', intro: 'Who will receive it, and where?' }, { title: 'Consignment', intro: 'What is being shipped?' }, { title: 'Carrier & Delivery', intro: 'How it travels and when it should arrive.' }, { title: 'Review', intro: isAdmin ? 'Check everything before creating the shipment.' : 'Check everything before submitting your request.' }];
   const last = steps.length - 1;
   const [step, setStep] = useState(startStep);
   const [draft, setDraft] = useState<ShipmentDraft>(() => initial || readDraft(draftKey) || emptyShipmentDraft);
@@ -88,11 +89,12 @@ export default function ShipmentWizard({ mode, initial, initialPhotos = [], subm
     if (index === 2) {
       if (!draft.packageName.trim()) return 'Enter what is being shipped.';
       if (draft.packageValue.trim() && !(Number(draft.packageValue) >= 0)) return 'Package value must be a number.';
-      if (isAdmin && draft.paymentStatus === 'pending' && draft.outstandingAmount.trim() && !(Number(draft.outstandingAmount) > 0)) return 'Outstanding amount must be more than 0.';
+      if (!isSupportedCurrency(draft.currency)) return 'Choose a valid ISO currency.';
+      if (draft.paymentStatus === 'pending' && !(Number(draft.outstandingAmount) > 0)) return 'Outstanding amount must be more than 0.';
       if (photos.length < 1) return 'Upload at least one package image.';
       if (photos.length > 3) return 'Use no more than 3 package images.';
     }
-    if (index === 3 && isAdmin) {
+    if (index === 3) {
       const eta = draft.estimatedDelivery ? new Date(draft.estimatedDelivery).getTime() : NaN;
       if (!Number.isFinite(eta)) return 'Set the estimated delivery date and time.';
       if (eta <= Date.now()) return 'The estimated delivery must be in the future.';
@@ -120,8 +122,8 @@ export default function ShipmentWizard({ mode, initial, initialPhotos = [], subm
     </label>;
 
   const reviewCard = (title: string, index: number, body: ReactNode) => <section><div><h3>{title}</h3><button type="button" onClick={() => goTo(index)}>Edit</button></div><div className="dhl-admin-review-body">{body}</div></section>;
-  const money = (value: string) => value.trim() ? `${draft.currency} ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not provided';
-  const eta = draft.estimatedDelivery ? new Date(draft.estimatedDelivery).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not set';
+  const money = (value: string) => value.trim() ? formatCurrency(Number(value), draft.currency, locale) : 'Not provided';
+  const eta = draft.estimatedDelivery ? new Date(draft.estimatedDelivery).toLocaleString(locale, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not set';
   const packageStep = 2;
   const carrierStep = 3;
 
@@ -136,7 +138,7 @@ export default function ShipmentWizard({ mode, initial, initialPhotos = [], subm
         {text('Sender Name', 'senderName', { required: true, placeholder: 'Full name', autoComplete: 'name' })}
         {text('Sender Phone', 'senderPhone', { optional: true, type: 'tel', inputMode: 'tel', placeholder: '+1 555 000 0000', autoComplete: 'tel' })}
         {text('Pickup Address', 'pickupLocation', { required: true, multiline: true, placeholder: '123 Business Avenue, New York, NY, United States', autoComplete: 'street-address' })}
-        {isAdmin && <RouteLocationField label="Pickup location on the map" address={draft.pickupLocation} value={draft.route.origin} onChange={origin => setDraft(current => ({ ...current, route: { ...current.route, origin } }))} />}
+        <RouteLocationField label="Pickup location on the map" address={draft.pickupLocation} value={draft.route.origin} onChange={origin => setDraft(current => ({ ...current, route: { ...current.route, origin } }))} />
       </div>}
 
       {step === 1 && <div className="dhl-admin-form-grid single">
@@ -144,24 +146,24 @@ export default function ShipmentWizard({ mode, initial, initialPhotos = [], subm
         {text('Receiver Phone', 'receiverPhone', { required: true, type: 'tel', inputMode: 'tel', placeholder: '+1 555 000 0000' })}
         {text('Receiver Email', 'receiverEmail', { required: true, type: 'email', inputMode: 'email', placeholder: 'name@example.com' })}
         {text('Drop-off Address', 'deliveryAddress', { required: true, multiline: true, placeholder: '1200 Wilshire Blvd, Los Angeles, CA, United States' })}
-        {isAdmin && <RouteLocationField label="Drop-off location on the map" address={draft.deliveryAddress} value={draft.route.destination} onChange={destination => setDraft(current => ({ ...current, route: { ...current.route, destination } }))} />}
+        <RouteLocationField label="Drop-off location on the map" address={draft.deliveryAddress} value={draft.route.destination} onChange={destination => setDraft(current => ({ ...current, route: { ...current.route, destination } }))} />
       </div>}
 
       {step === packageStep && <>
         <div className="dhl-admin-form-grid single">
           {text('What is being shipped?', 'packageName', { required: true, placeholder: 'e.g. Personal documents, electronics, artwork' })}
-          <div className="dhl-admin-form-field wide"><span>Package Value <em>(Optional)</em></span><div className="dhl-admin-money"><select value={draft.currency} onChange={event => set('currency', event.target.value)} aria-label="Currency">{currencies.map(code => <option key={code}>{code}</option>)}</select><input type="number" inputMode="decimal" min="0" value={draft.packageValue} onChange={event => set('packageValue', event.target.value)} placeholder="0.00" aria-label="Package value" /></div></div>
+          <div className="dhl-admin-form-field wide"><span>Package Value <em>(Optional)</em></span><div className="dhl-admin-money"><select value={draft.currency} onChange={event => set('currency', event.target.value)} aria-label="Currency">{currencies.map(currency => <option key={currency.code} value={currency.code}>{currency.code} — {currency.name}{currency.symbol ? ` — ${currency.symbol}` : ''}</option>)}</select><input type="number" inputMode="decimal" min="0" value={draft.packageValue} onChange={event => set('packageValue', event.target.value)} placeholder="0.00" aria-label="Package value" /></div></div>
         </div>
-        {isAdmin && <>
+        <>
           <h3 className="dhl-admin-step-subhead">Payment Status</h3>
           <div className="dhl-admin-choice-grid payment" role="radiogroup" aria-label="Payment status">{(Object.keys(paymentLabels) as PaymentChoice[]).map(value => <button key={value} type="button" role="radio" aria-checked={draft.paymentStatus === value} className={draft.paymentStatus === value ? 'selected' : ''} onClick={() => set('paymentStatus', value)}><strong>{paymentLabels[value]}</strong></button>)}</div>
           {draft.paymentStatus === 'pending' && <div className="dhl-admin-form-grid single">{text('Outstanding Amount', 'outstandingAmount', { optional: true, type: 'number', inputMode: 'decimal', placeholder: '0.00' })}</div>}
-        </>}
+        </>
         <h3 className="dhl-admin-step-subhead">Package Photos <small>At least 1, up to 3.</small></h3>
         <PackagePhotoUploader photos={photos} onChange={next => { setPhotos(next); setError(''); }} onError={setError} />
       </>}
 
-      {isAdmin && step === carrierStep && <>
+      {step === carrierStep && <>
         <div className="dhl-admin-form-grid single">
           <label className="dhl-admin-form-field"><span>Estimated Delivery<i> *</i></span><input type="datetime-local" value={draft.estimatedDelivery} onChange={event => set('estimatedDelivery', event.target.value)} /></label>
         </div>
@@ -177,16 +179,16 @@ export default function ShipmentWizard({ mode, initial, initialPhotos = [], subm
       {step === last && <div className="dhl-admin-review">
         {reviewCard('Sender', 0, <><strong>{draft.senderName}</strong>{draft.senderPhone && <span>{draft.senderPhone}</span>}<span>{draft.pickupLocation}</span></>)}
         {reviewCard('Receiver', 1, <><strong>{draft.receiverName}</strong><span>{draft.receiverPhone} · {draft.receiverEmail}</span><span>{draft.deliveryAddress}</span></>)}
-        {reviewCard(isAdmin ? 'Consignment' : 'Package', packageStep, <><strong>{draft.packageName}</strong><span>Value: {money(draft.packageValue)}</span>{isAdmin && <span>Payment: {paymentLabels[draft.paymentStatus]}{draft.paymentStatus === 'pending' && draft.outstandingAmount ? ` · ${money(draft.outstandingAmount)} outstanding` : ''}</span>}{photos.length > 0 && <div className="dhl-admin-review-photos">{photos.map((photo, index) => <img key={photo.id} src={photo.url} alt={`Package photo ${index + 1}`} />)}</div>}</>)}
-        {isAdmin && reviewCard('Carrier & Delivery', carrierStep, <><strong>{draft.transportation}</strong><span>{draft.carrierRole}{draft.carrierName ? ` · ${draft.carrierName}` : ''}</span><span>Estimated delivery: {eta}</span></>)}
-        {isAdmin && <section className="dhl-admin-review-route">
+        {reviewCard('Consignment', packageStep, <><strong>{draft.packageName}</strong><span>Value: {money(draft.packageValue)}</span><span>Payment: {paymentLabels[draft.paymentStatus]}{draft.paymentStatus === 'pending' && draft.outstandingAmount ? ` · ${money(draft.outstandingAmount)} outstanding` : ''}</span>{photos.length > 0 && <div className="dhl-admin-review-photos">{photos.map((photo, index) => <img key={photo.id} src={photo.url} alt={`Package photo ${index + 1}`} />)}</div>}</>)}
+        {reviewCard('Carrier & Delivery', carrierStep, <><strong>{draft.transportation}</strong><span>{draft.carrierRole}{draft.carrierName ? ` · ${draft.carrierName}` : ''}</span><span>Estimated delivery: {eta}</span></>)}
+        <section className="dhl-admin-review-route">
           <div><h3><MapPinned size={16} /> Route</h3><button type="button" onClick={() => goTo(0)}>Edit</button></div>
           {draft.route.origin && draft.route.destination
             ? <><RouteMap stops={[draft.route.origin, draft.route.destination]} transport={draft.transportation} height={220} ariaLabel="Route preview" /><div className="dhl-admin-review-body"><span>{draft.route.origin.detail || draft.route.origin.label} → {draft.route.destination.detail || draft.route.destination.label} · approx. {formatDistance(pathLengthKm([draft.route.origin, draft.route.destination])).km}</span></div></>
             : <div className="dhl-admin-review-body"><span>{draft.route.origin || draft.route.destination ? 'Only one route location is set.' : 'No route locations yet.'} Confirm the pickup and drop-off locations in steps 1 and 2 to show the map.</span></div>}
           <button type="button" className="dhl-admin-text-action" onClick={() => setRouteOpen(open => !open)}>{routeOpen ? 'Hide manual placement' : 'Advanced: place pins manually'}</button>
           {routeOpen && <RoutePicker route={draft.route} onChange={route => set('route', route)} />}
-        </section>}
+        </section>
         <div className="dhl-admin-review-note"><FileText size={18} /><span>{isAdmin ? 'Creating the shipment does not start it. You will publish it (tracking number) and start it from the control panel.' : 'Submitting sends your details for review. The shipment is not active until our team approves it.'}</span></div>
         {reviewFooter}
       </div>}

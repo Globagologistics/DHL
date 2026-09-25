@@ -24,6 +24,7 @@
 --   supabase/migrations/20260927000000_portfolio_demo_shipment.sql
 --   supabase/migrations/20260927000001_remove_legacy_development_admin.sql
 --   supabase/migrations/20260927000002_secure_storage_policies.sql
+--   supabase/migrations/20260928000000_admin_image_upload_cleanup.sql
 
 -- ===========================================================================
 -- supabase/migrations/20260812000000_baseline.sql
@@ -1991,4 +1992,19 @@ WITH CHECK (
   AND public.current_user_can_access_chat((storage.foldername(name))[1]::uuid)
   AND lower(coalesce(metadata ->> 'mimetype', '')) IN ('image/jpeg', 'image/png', 'image/webp', 'video/mp4', 'video/webm')
   AND coalesce(nullif(metadata ->> 'size', '')::bigint, 0) BETWEEN 1 AND 10485760
+);
+
+-- ===========================================================================
+-- supabase/migrations/20260928000000_admin_image_upload_cleanup.sql
+-- ===========================================================================
+
+-- Admin uploads are transactional from the application's point of view: if a
+-- later image fails, the client may remove only the freshly uploaded objects.
+-- Public request uploads intentionally do not receive delete permission.
+DROP POLICY IF EXISTS "Admins can delete operational media" ON storage.objects;
+CREATE POLICY "Admins can delete operational media"
+ON storage.objects FOR DELETE TO authenticated
+USING (
+  bucket_id IN ('shipment-images', 'driver-images', 'route-screenshots')
+  AND public.current_user_is_admin()
 );

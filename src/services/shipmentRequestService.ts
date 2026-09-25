@@ -17,10 +17,12 @@ const MIGRATION_HINT = 'Shipment requests need the request migrations (applied d
 /** Only the customer-facing fields of a draft travel in a new request. */
 export function requestPayloadFromDraft(draft: ShipmentDraft, images: string[]): ShipmentRequestPayload {
   return {
+    ...draft,
     senderName: draft.senderName.trim(), senderPhone: draft.senderPhone.trim(), pickupLocation: draft.pickupLocation.trim(),
     receiverName: draft.receiverName.trim(), receiverPhone: draft.receiverPhone.trim(), receiverEmail: draft.receiverEmail.trim(), deliveryAddress: draft.deliveryAddress.trim(),
-    packageName: draft.packageName.trim(), packageValue: draft.packageValue.trim(), currency: draft.currency,
-    images, checkpoints: [],
+    packageName: draft.packageName.trim(), packageValue: draft.packageValue.trim(), outstandingAmount: draft.outstandingAmount.trim(),
+    carrierRole: draft.carrierRole.trim(), carrierName: draft.carrierName.trim(), images, checkpoints: [],
+    estimatedDeliveryAt: draft.estimatedDelivery ? new Date(draft.estimatedDelivery).toISOString() : undefined,
   };
 }
 

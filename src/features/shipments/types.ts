@@ -1,3 +1,5 @@
+export { currencies } from '../../data/currencies';
+export type { Currency } from '../../data/currencies';
 /** Shared shipment form and request types (wizard, services, development store). */
 
 export type PaymentChoice = 'paid' | 'unpaid' | 'pending';
@@ -50,7 +52,6 @@ export const defaultCarrierRole: Record<TransportMethod, string> = {
   'Air Freight': 'Pilot', 'Sea Freight': 'Captain', Truck: 'Driver', 'Courier / Dispatcher': 'Courier', Motorcycle: 'Rider',
 };
 export const carrierRoles = ['Pilot', 'Captain', 'Driver', 'Courier', 'Rider', 'Dispatcher'];
-export const currencies = ['USD', 'NGN', 'GBP', 'EUR'];
 export const paymentLabels: Record<PaymentChoice, string> = { paid: 'Paid', unpaid: 'Unpaid', pending: 'Outstanding Payment' };
 
 /** Stored in shipment_requests.payload. Admin fields are added during review. */

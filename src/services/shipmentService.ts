@@ -232,10 +232,10 @@ export async function uploadImage(
       .from(bucket)
       .getPublicUrl(fileName);
 
-    return { url: publicUrl.publicUrl, error: null };
+    return { url: publicUrl.publicUrl, path: fileName, error: null };
   } catch (error) {
     return {
-      url: null,
+      url: null, path: null,
       error: error instanceof Error ? error.message : 'Failed to upload image',
     };
   }
