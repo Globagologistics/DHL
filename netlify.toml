@@ -4,6 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # This is a browser-safe public credential that Vite intentionally embeds
+  # in the client bundle. Keep secrets scanning enabled for all private keys.
+  SECRETS_SCAN_OMIT_KEYS = "VITE_SUPABASE_ANON_KEY"
 
 # Public Supabase settings are not stored here. Add VITE_SUPABASE_URL and
 # VITE_SUPABASE_ANON_KEY under Site configuration → Environment variables
