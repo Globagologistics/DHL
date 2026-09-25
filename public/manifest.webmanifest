@@ -7,6 +7,6 @@
   "background_color": "#F7F7F5",
   "theme_color": "#FFCC00",
   "icons": [
-    { "src": "/shipment-tracking-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/dhl-concept-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

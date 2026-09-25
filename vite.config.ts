@@ -17,7 +17,7 @@ export default defineConfig(({ command, mode }) => {
       isProd && VitePWA({
         registerType: 'autoUpdate',
         includeAssets: [
-          'shipment-tracking-icon.svg',
+          'dhl-concept-icon.svg',
           'dhl-concept-logo.svg',
         ],
         manifest: {
@@ -30,13 +30,13 @@ export default defineConfig(({ command, mode }) => {
           start_url: '/',
           icons: [
             {
-              src: '/shipment-tracking-icon.svg',
+              src: '/dhl-concept-icon.svg',
               sizes: '192x192',
               type: 'image/svg+xml',
               purpose: 'any'
             },
             {
-              src: '/shipment-tracking-icon.svg',
+              src: '/dhl-concept-icon.svg',
               sizes: '512x512',
               type: 'image/svg+xml',
               purpose: 'any'
