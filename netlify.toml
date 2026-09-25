@@ -4,6 +4,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  VITE_APP_BASE_URL = "https://trackshipmentpro.netlify.app"
 
 # Public Supabase settings are not stored here. Add VITE_SUPABASE_URL and
 # VITE_SUPABASE_ANON_KEY under Site configuration → Environment variables

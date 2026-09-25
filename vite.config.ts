@@ -44,14 +44,10 @@ export default defineConfig(({ command, mode }) => {
           ]
         },
         workbox: {
+          // Do not cache HTML routes or API calls. A cached application bundle
+          // can contain superseded Supabase configuration and break sign-in.
+          cleanupOutdatedCaches: true,
           runtimeCaching: [
-            {
-              urlPattern: /\/.*/,
-              handler: 'NetworkFirst',
-              options: {
-                cacheName: 'pages-cache',
-              },
-            },
             {
               urlPattern: /\.(?:png|jpg|jpeg|svg|gif)$/,
               handler: 'CacheFirst',
