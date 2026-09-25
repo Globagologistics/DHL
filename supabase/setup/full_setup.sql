@@ -46,11 +46,6 @@ CREATE TABLE IF NOT EXISTS public.users (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- Default admin for development/demo
-INSERT INTO public.users (id, email, user_type, full_name)
-VALUES ('00000000-0000-0000-0000-000000000000', 'admin@buske.local', 'admin', 'Default Admin')
-ON CONFLICT (id) DO NOTHING;
-
 -- Shipments
 CREATE TABLE IF NOT EXISTS public.shipments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

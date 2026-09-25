@@ -17,26 +17,26 @@ export default defineConfig(({ command, mode }) => {
       isProd && VitePWA({
         registerType: 'autoUpdate',
         includeAssets: [
-          'dhl-concept-icon.svg',
+          'shipment-tracking-icon.svg',
           'dhl-concept-logo.svg',
         ],
         manifest: {
-          name: 'DHL Express redesign concept',
-          short_name: 'DHL Concept',
-          description: 'Shipment tracking redesign concept.',
+          name: 'Shipment Tracking Demo',
+          short_name: 'Shipment Tracking',
+          description: 'Track your package seamlessly, follow delivery progress, and access shipment support from one place.',
           theme_color: '#FFCC00',
           background_color: '#ffffff',
           display: 'standalone',
           start_url: '/',
           icons: [
             {
-              src: '/dhl-concept-icon.svg',
+              src: '/shipment-tracking-icon.svg',
               sizes: '192x192',
               type: 'image/svg+xml',
               purpose: 'any'
             },
             {
-              src: '/dhl-concept-icon.svg',
+              src: '/shipment-tracking-icon.svg',
               sizes: '512x512',
               type: 'image/svg+xml',
               purpose: 'any'
@@ -80,7 +80,9 @@ export default defineConfig(({ command, mode }) => {
     assetsInclude: ['**/*.svg', '**/*.csv'],
 
     build: {
-      sourcemap: isProd,
+      // Source maps are useful locally but should not publish an unnecessary
+      // source archive for this private, gated deployment.
+      sourcemap: false,
       minify: 'esbuild',
       chunkSizeWarningLimit: 1500,
       rollupOptions: {

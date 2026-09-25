@@ -52,9 +52,31 @@ type Shipment = {
   published_at: string | null;
   /** Customer-facing 12-digit number; absent before migration 20260925000000. */
   tracking_number?: string | null;
+  /** Synthetic portfolio shipment; never deliver to an external recipient. */
+  is_demo?: boolean;
 };
 
 type Recipient = { email: string; role: 'admin' | 'sender' | 'receiver'; name: string };
+
+type NotificationPreferences = {
+  emailEnabled?: boolean;
+  categories?: Record<string, boolean>;
+};
+
+const preferenceCategoryFor = (eventType: EventType) => {
+  if (eventType === 'shipment_published') return 'shipmentCreated';
+  if (eventType === 'delivered') return 'delivered';
+  if (eventType === 'chat_customer_message' || eventType === 'chat_admin_reply') return 'customerSupportMessage';
+  if (eventType === 'shipment_status_changed' || eventType === 'on_hold' || eventType === 'released' || eventType === 'delayed' || eventType === 'cancelled' || eventType === 'terminated') return 'shipmentUpdated';
+  return 'adminNotification';
+};
+
+const emailAllowed = (value: unknown, eventType: EventType) => {
+  const preferences = (value && typeof value === 'object' ? value : {}) as NotificationPreferences;
+  if (preferences.emailEnabled === false) return false;
+  const category = preferenceCategoryFor(eventType);
+  return preferences.categories?.[category] !== false;
+};
 
 const required = (name: string) => {
   const value = process.env[name]?.trim();
@@ -208,7 +230,7 @@ export const processNotificationEvents = async () => {
     const smtpUser = required('SMTP_USER');
     const smtpPassword = required('SMTP_APP_PASSWORD');
     const adminEmail = required('ADMIN_EMAIL');
-    const appName = process.env.APP_NAME?.trim() || 'DHL Express redesign concept';
+    const appName = process.env.APP_NAME?.trim() || 'Shipment Tracking Demo';
     // APP_URL always remains the canonical customer site. A test recipient is
     // inert unless an operator explicitly enables server-side test mode.
     const productionAppUrl = required('APP_URL');
@@ -226,6 +248,8 @@ export const processNotificationEvents = async () => {
       process.env.SUPPORT_URL?.trim() || `${appUrl.replace(/\/$/, '')}/chat`;
     const logoUrl = process.env.LOGO_URL?.trim() || '';
     const supabase = createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+    const { data: preferenceRow } = await supabase.from('app_settings').select('value').eq('key', 'notification_preferences').maybeSingle();
+    const preferences = preferenceRow?.value;
     const transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST?.trim() || 'smtp.gmail.com',
       port: Number(process.env.SMTP_PORT || 465),
@@ -249,6 +273,24 @@ export const processNotificationEvents = async () => {
       if (shipmentError || !shipment) {
         await supabase.from('notification_events').update({ status: 'failed', attempt_count: event.attempt_count + 1, last_error: 'Shipment record is unavailable', next_attempt_at: new Date(Date.now() + 15 * 60_000).toISOString(), claim_token: null, claimed_at: null }).eq('id', event.id).eq('claim_token', event.claim_token);
         failed += 1;
+        continue;
+      }
+
+      if ((shipment as Shipment).is_demo) {
+        // Keep the operational event history, but the portfolio record must
+        // never result in real email/SMS/WhatsApp delivery.
+        await supabase.from('notification_events').update({
+          status: 'processed', processed_at: new Date().toISOString(),
+          last_error: 'Demo — external delivery suppressed', claim_token: null, claimed_at: null,
+        }).eq('id', event.id).eq('claim_token', event.claim_token);
+        continue;
+      }
+
+      if (!emailAllowed(preferences, event.event_type)) {
+        await supabase.from('notification_events').update({
+          status: 'processed', processed_at: new Date().toISOString(),
+          last_error: 'External email disabled by notification preferences', claim_token: null, claimed_at: null,
+        }).eq('id', event.id).eq('claim_token', event.claim_token);
         continue;
       }
 

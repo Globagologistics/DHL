@@ -6,10 +6,12 @@ export const brandConfig = {
   supportName: 'DHL Shipment Support',
   trackingLabel: 'Tracking number',
   shipmentLabel: 'Shipment',
-  pageTitle: 'DHL Express | Shipment tracking concept',
-  metaDescription: 'A DHL Express redesign concept for tracking shipments and contacting shipment support.',
+  // Public browser metadata remains neutral; on-screen brand presentation is
+  // intentionally isolated from the public deployment identity.
+  pageTitle: 'Shipment Tracking Demo',
+  metaDescription: 'Track your package seamlessly, follow delivery progress, and access shipment support from one place.',
   logo: '/dhl-concept-logo.svg',
-  favicon: '/dhl-concept-icon.svg',
+  favicon: '/shipment-tracking-icon.svg',
   campaignImage: '/images/dhl-logistics-campaign.jpeg',
   cinematicLogo: '/dhl-cinematic-logo.svg',
   cinematicPortrait: {

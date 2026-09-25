@@ -1,12 +1,12 @@
 {
-  "name": "DHL Express redesign concept",
-  "short_name": "DHL Concept",
-  "description": "Shipment tracking redesign concept",
+  "name": "Shipment Tracking Demo",
+  "short_name": "Shipment Tracking",
+  "description": "Track your package seamlessly, follow delivery progress, and access shipment support from one place.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#F7F7F5",
   "theme_color": "#FFCC00",
   "icons": [
-    { "src": "/dhl-concept-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/shipment-tracking-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ]
 }

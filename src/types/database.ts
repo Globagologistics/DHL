@@ -60,6 +60,8 @@ export interface Shipment {
   id: string;
   /** Customer-facing 12-digit number, assigned when the shipment is published. */
   tracking_number?: string | null;
+  /** True only for the isolated synthetic portfolio shipment. */
+  is_demo?: boolean;
   shipment_details?: ShipmentDetails | null;
   lifecycle_state?: LifecycleState | null;
   lifecycle_events?: ShipmentEvent[] | null;

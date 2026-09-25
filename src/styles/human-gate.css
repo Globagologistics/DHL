@@ -1,0 +1,14 @@
+.dhl-human-gate-blocked { filter: blur(8px); pointer-events: none; user-select: none; }
+.dhl-human-gate-scene, .dhl-human-gate-overlay { position: fixed; inset: 0; z-index: 1000; }
+.dhl-human-gate-scene { overflow: hidden; background: #191919; }
+.dhl-human-gate-scene picture, .dhl-human-gate-scene img { display: block; width: 100%; height: 100%; }
+.dhl-human-gate-scene img { object-fit: cover; object-position: 54% 38%; filter: blur(8px) brightness(.62); transform: scale(1.04); }
+.dhl-human-gate-overlay { z-index: 1001; display: grid; place-items: center; padding: 20px; background: rgba(9, 10, 10, .24); }
+.dhl-human-gate-bar { width: min(100%, 380px); min-height: 64px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; gap: 12px; padding: 8px 14px; border: 1px solid rgba(255, 255, 255, .24); border-radius: 14px; background: rgba(20, 20, 20, .78); box-shadow: 0 18px 54px rgba(0, 0, 0, .3); backdrop-filter: blur(14px); color: #fff; font: 600 15px/1.25 Arial, sans-serif; }
+.dhl-human-gate-spinner { animation: dhl-human-gate-spin .9s linear infinite; }
+.dhl-human-gate-choice { min-height: 44px; display: flex; align-items: center; justify-content: center; gap: 12px; border: 0; background: transparent; color: #fff; cursor: pointer; font: inherit; }
+.dhl-human-gate-box, .dhl-human-gate-check { display: grid; width: 27px; height: 27px; flex: 0 0 27px; place-items: center; border: 2px solid rgba(255,255,255,.9); border-radius: 7px; }
+.dhl-human-gate-check { border-color: #ffcc00; background: #ffcc00; color: #191919; }
+@keyframes dhl-human-gate-spin { to { transform: rotate(360deg); } }
+@media (min-width: 900px) { .dhl-human-gate-scene img { content: url('/images/dhl-cinematic-landscape.jpg'); object-position: center; } }
+@media (prefers-reduced-motion: reduce) { .dhl-human-gate-spinner { animation: none; } }

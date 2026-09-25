@@ -13,6 +13,10 @@
   directory = "netlify/functions"
   node_bundler = "esbuild"
 
+[[edge_functions]]
+  function = "human-gate"
+  path = "/*"
+
 [functions."notification-sweeper"]
   schedule = "*/5 * * * *"
 
@@ -29,6 +33,7 @@
     X-Content-Type-Options = "nosniff"
     X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Robots-Tag = "noindex, nofollow, noarchive, nosnippet"
 
 [[redirects]]
   from = "/*"

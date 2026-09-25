@@ -13,6 +13,8 @@ export const environment = {
   devAdminBypass: import.meta.env.DEV && import.meta.env.VITE_DEV_ADMIN_BYPASS === 'true',
   /** Development-only settings store in this browser. Never used for credentials. */
   settingsDevAdapter: import.meta.env.DEV && import.meta.env.VITE_SETTINGS_DEV_ADAPTER === 'true',
+  /** Vite-only inspection of the deployed Netlify Edge verification gate. */
+  localHumanGatePreview: import.meta.env.DEV && import.meta.env.VITE_HUMAN_GATE_LOCAL_PREVIEW === 'true',
 } as const;
 
 export const hasBackendConfiguration = Boolean(environment.supabaseUrl && environment.supabasePublicKey);

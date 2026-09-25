@@ -15,6 +15,8 @@ export interface Shipment {
   id: string;
   /** Customer-facing 12-digit number (null until the tracking-number migration is applied). */
   trackingNumber?: string | null;
+  /** Synthetic portfolio shipment; external delivery is suppressed server-side. */
+  isDemo?: boolean;
   /** Structured wizard details (null until the shipment-details migration is applied). */
   details?: ShipmentDetails | null;
   createdAt?: string;
@@ -77,7 +79,7 @@ interface AdminContextType {
 /** Maps a database row to the admin list shape (used for development-store rows). */
 function toAdminShipment(ship: ShipmentWithCheckpoints): Shipment {
   return {
-    id: ship.id, trackingNumber: ship.tracking_number || null, details: ship.shipment_details || null,
+    id: ship.id, trackingNumber: ship.tracking_number || null, isDemo: Boolean(ship.is_demo), details: ship.shipment_details || null,
     createdAt: ship.created_at, updatedAt: ship.updated_at, estimatedDeliveryAt: ship.estimated_delivery_at,
     senderName: ship.sender_name, senderPhone: ship.sender_phone, senderEmail: ship.sender_email,
     receiverName: ship.receiver_name, receiverPhone: ship.receiver_phone, receiverEmail: ship.receiver_email || '',
@@ -207,6 +209,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           return {
             id: ship.id,
             trackingNumber: ship.tracking_number || null,
+            isDemo: Boolean(ship.is_demo),
             details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
@@ -415,6 +418,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship) => ({
             id: ship.id,
             trackingNumber: ship.tracking_number || null,
+            isDemo: Boolean(ship.is_demo),
             details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
@@ -526,6 +530,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
             trackingNumber: ship.tracking_number || null,
+            isDemo: Boolean(ship.is_demo),
             details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
@@ -596,6 +601,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
             trackingNumber: ship.tracking_number || null,
+            isDemo: Boolean(ship.is_demo),
             details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
@@ -692,6 +698,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
             trackingNumber: ship.tracking_number || null,
+            isDemo: Boolean(ship.is_demo),
             details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,
@@ -756,6 +763,7 @@ export const AdminProvider = ({ children }: { children: ReactNode }) => {
           const transformedShipments: Shipment[] = (refreshedShipments as ShipmentWithCheckpoints[]).map((ship: ShipmentWithCheckpoints) => ({
             id: ship.id,
             trackingNumber: ship.tracking_number || null,
+            isDemo: Boolean(ship.is_demo),
             details: ship.shipment_details || null,
             createdAt: ship.created_at,
             updatedAt: ship.updated_at,

@@ -84,7 +84,7 @@ async function authenticateAdmin(event: HandlerEvent, supabase: ReturnType<typeo
 }
 
 function brandedEmail({ heading, body, trackingNumber, actionUrl }: { heading: string; body: string; trackingNumber?: string; actionUrl?: string }) {
-  const appName = process.env.APP_NAME?.trim() || 'DHL Express';
+  const appName = process.env.APP_NAME?.trim() || 'Shipment Tracking Demo';
   const paragraphs = escapeHtml(body).split(/\n{2,}/).map(part => `<p style="margin:0 0 14px;line-height:1.55">${part.replace(/\n/g, '<br>')}</p>`).join('');
   const html = `<!doctype html><html><body style="margin:0;background:#f7f7f5;font-family:Arial,Helvetica,sans-serif;color:#1d1d1b">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:24px 12px">
@@ -98,7 +98,7 @@ ${actionUrl ? `<p style="margin:22px 0 8px"><a href="${escapeHtml(actionUrl)}" s
   return { html, text };
 }
 
-const fromAddress = () => `${process.env.APP_NAME?.trim() || 'DHL Express'} <${process.env.SMTP_USER?.trim()}>`;
+const fromAddress = () => `${process.env.APP_NAME?.trim() || 'Shipment Tracking Demo'} <${process.env.SMTP_USER?.trim()}>`;
 
 export const handler: Handler = async (event) => {
   if (event.httpMethod !== 'GET' && event.httpMethod !== 'POST') return json(405, { error: 'Method not allowed' });

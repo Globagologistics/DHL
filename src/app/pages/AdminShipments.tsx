@@ -58,7 +58,7 @@ export default function AdminShipments() {
         : !visible.length ? <div className="dhl-admin-empty"><Package size={24} /><strong>No matching shipments</strong><span>Try a different search or status.</span></div>
           : <>
             <div className="dhl-admin-table-wrap dhl-admin-shipment-table"><table className="dhl-admin-table"><thead><tr><th>Tracking number</th><th>Package</th><th>Receiver</th><th>Route</th><th>Status</th><th>Est. delivery</th><th>Actions</th></tr></thead><tbody>{visible.map(shipment => <tr key={shipment.id}>
-              <td className="mono"><Link to={`/admin/shipments/${shipment.id}`}>{referenceOf(shipment)}</Link></td>
+              <td className="mono"><Link to={`/admin/shipments/${shipment.id}`}>{referenceOf(shipment)}</Link>{shipment.isDemo && <small className="dhl-admin-demo-badge">Demo</small>}</td>
               <td><strong>{shipment.packageName || 'Shipment'}</strong><small>{shipment.transportation}</small></td>
               <td><strong>{shipment.receiverName || 'Not provided'}</strong><small>{shipment.receiverEmail || shipment.receiverPhone}</small></td>
               <td>{place(shipment.pickupLocation)} → {place(shipment.deliveryAddress)}</td>
