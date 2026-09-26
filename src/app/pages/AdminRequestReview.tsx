@@ -5,8 +5,7 @@ import ShipmentWizard from '../../features/shipment-form/ShipmentWizard';
 import { emptyShipmentDraft } from '../../features/shipments/types';
 import type { ShipmentDraft } from '../../features/shipments/types';
 import { approveShipmentRequest, listShipmentRequests, rejectShipmentRequest } from '../../services/shipmentRequestService';
-import { storePackagePhotos } from '../../services/shipmentWorkflowService';
-import { isDevRequestId } from '../../demo/devDataStore';
+import { packagePhotoUrls } from '../../services/shipmentWorkflowService';
 import type { ShipmentRequest } from '../../services/shipmentRequestService';
 
 const draftFromRequest = (request: ShipmentRequest): ShipmentDraft => {
@@ -52,13 +51,13 @@ export default function AdminRequestReview() {
       ? <div className="dhl-admin-card dhl-admin-empty"><Package size={24} /><strong>This request was {request.status}</strong>{request.rejection_reason && <span>Reason: {request.rejection_reason}</span>}{request.shipment_id && <Link className="dhl-admin-button primary" to={`/admin/shipments/${request.shipment_id}`}>Open Shipment Control</Link>}</div>
       : <>
         <p className="dhl-admin-banner" role="status">Check the customer’s details, then add the delivery estimate, payment status and carrier in step 4. Approving creates a scheduled shipment; you publish and start it separately.</p>
-        <ShipmentWizard mode="admin" initial={initial} initialPhotos={photos} submitLabel="Approve & Create Shipment" submitting={submitting} submitError={error}
+        <ShipmentWizard mode="admin" initial={initial} initialPhotos={photos} draftId={request.id} submitLabel="Approve & Create Shipment" submitting={submitting} submitError={error}
           reviewFooter={<div className="dhl-request-reject"><h3><XCircle size={16} /> Reject request</h3><textarea rows={2} value={reason} onChange={event => setReason(event.target.value)} placeholder="Reason for rejecting (kept with the request)" aria-label="Reason for rejecting" /><button type="button" className="dhl-admin-button danger" disabled={!reason.trim() || rejecting} onClick={() => void reject()}>{rejecting ? 'Rejecting…' : 'Reject Request'}</button></div>}
           onSubmit={async (draft, next) => {
             setSubmitting(true); setError('');
             try {
-              // Photos added or replaced during review are uploaded before approval.
-              const images = await storePackagePhotos(next, `requests/${request.id}`, isDevRequestId(request.id));
+              // Photos are already stored: the uploader writes them as they are chosen.
+              const images = packagePhotoUrls(next);
               const shipmentId = await approveShipmentRequest(request.id, { ...draft, images });
               navigate(`/admin/shipments/${shipmentId}?created=1`);
             } catch (cause) { setError(cause instanceof Error ? cause.message : 'Approval failed.'); }

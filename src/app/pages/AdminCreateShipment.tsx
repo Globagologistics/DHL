@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import ShipmentWizard from '../../features/shipment-form/ShipmentWizard';
 import { CopyFormLinkButton } from '../../features/shipments/ShipmentBits';
-import { createScheduledShipment } from '../../services/shipmentWorkflowService';
+import { confirmShipmentExists, createScheduledShipment } from '../../services/shipmentWorkflowService';
 
 /** Guided creation. The result is a SCHEDULED shipment: not published, not moving. */
 export default function AdminCreateShipment() {
@@ -17,9 +17,17 @@ export default function AdminCreateShipment() {
       submitLabel="Create Shipment"
       submitting={submitting}
       submitError={error}
-      onSubmit={async (draft, photos) => {
+      onSubmit={async (draft, photos, meta) => {
         setSubmitting(true); setError('');
-        try { const id = await createScheduledShipment(draft, photos); navigate(`/admin/shipments/${id}?created=1`); }
+        try {
+          // The shipment takes the draft id, so its images are already filed
+          // under shipments/<shipment-id>/ and never need moving.
+          const id = await createScheduledShipment(draft, photos, meta.draftId);
+          // Confirm the row really exists before the draft is thrown away.
+          await confirmShipmentExists(id);
+          await meta.completed();
+          navigate(`/admin/shipments/${id}?created=1`);
+        }
         catch (cause) { setError(cause instanceof Error ? cause.message : 'The shipment could not be created.'); }
         finally { setSubmitting(false); }
       }}

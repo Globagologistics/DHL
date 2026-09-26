@@ -168,7 +168,13 @@ export function RouteMap({ stops, progress, currentStop, transport, height = 300
   const pick = (event: MouseEvent<SVGSVGElement>) => {
     if (!onPick || !scene) return;
     const rect = event.currentTarget.getBoundingClientRect();
-    const coordinates = scene.projection.invert?.([event.clientX - rect.left, event.clientY - rect.top]);
+    if (!rect.width || !rect.height) return;
+    // The svg scales its viewBox to the box, so clicks are converted back to
+    // the projection's user units before inverting.
+    const coordinates = scene.projection.invert?.([
+      (event.clientX - rect.left) * (width / rect.width),
+      (event.clientY - rect.top) * (height / rect.height),
+    ]);
     if (coordinates) onPick({ lat: Number(coordinates[1].toFixed(4)), lng: Number((((coordinates[0] + 540) % 360) - 180).toFixed(4)) });
   };
 
@@ -191,7 +197,10 @@ export function RouteMap({ stops, progress, currentStop, transport, height = 300
   return <div ref={box} className={`dhl-route-map${onPick ? ' picking' : ''}`} style={{ height }}>
     {!layers && !failed && <div className="dhl-route-map-loading" aria-hidden="true" />}
     {failed && <p className="dhl-route-map-error">The map could not be drawn on this device.</p>}
-    {layers && scene && <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} role="img" aria-label={ariaLabel || 'Shipment route map'} onClick={pick}>
+    {/* The svg is sized by its viewBox, never by a pixel width attribute: a px
+        width would become this box's intrinsic minimum and ratchet the
+        surrounding grid wider on every ResizeObserver pass. */}
+    {layers && scene && <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={ariaLabel || 'Shipment route map'} onClick={pick}>
       <rect className="dhl-map-ocean" width={width} height={height} />
       <path className="dhl-map-graticule" d={scene.path(geoGraticule10()) || ''} />
       <g className="dhl-map-land">{layers.countries.map((country, index) => <path key={index} d={scene.path(country) || ''} />)}</g>

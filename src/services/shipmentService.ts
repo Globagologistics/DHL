@@ -209,6 +209,37 @@ export async function createCheckpoints(shipmentId: string, checkpoints: Partial
   }
 }
 
+/**
+ * Uploads to an exact object key. The caller owns the path, which lets the
+ * shipment wizard store an image at its permanent location before the
+ * shipment row exists.
+ */
+export async function uploadImageToPath(
+  bucket: 'shipment-images' | 'driver-images' | 'route-screenshots',
+  file: File,
+  path: string
+) {
+  try {
+    const uploadResult = await withTimeout(
+      // Never upsert: an upsert becomes INSERT ... ON CONFLICT DO UPDATE, which
+      // also needs a SELECT policy on storage.objects to read the conflicting
+      // row. Public buckets have none, so upserts are refused as an RLS
+      // violation. Photo ids are fresh UUIDs, so a collision cannot occur.
+      supabase.storage.from(bucket).upload(path, file, {
+        cacheControl: '3600',
+        contentType: file.type || undefined,
+        upsert: false,
+      }),
+      `Image upload timed out. Check that the Supabase "${bucket}" bucket exists and allows uploads.`
+    ) as { error: { message?: string } | null };
+    if (uploadResult.error) throw new Error(uploadResult.error.message || 'Upload rejected by storage');
+    const { data } = supabase.storage.from(bucket).getPublicUrl(path);
+    return { url: data.publicUrl, path, error: null as string | null };
+  } catch (error) {
+    return { url: null, path: null, error: error instanceof Error ? error.message : 'Failed to upload image' };
+  }
+}
+
 export async function uploadImage(
   bucket: 'shipment-images' | 'driver-images' | 'route-screenshots',
   file: File,

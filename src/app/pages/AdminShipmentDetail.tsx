@@ -12,6 +12,8 @@ import { LocationSearch, RouteLocationField } from '../../features/map/LocationF
 import { ACTIVE_STATES, FINAL_STATES, PAUSE_REASONS, actionRules, allowedActions, canSoftDelete, customerUpdateMessage, deriveLifecycleState, displayProgress, lifecycleLabels } from '../../features/shipments/lifecycle';
 import type { LifecycleAction } from '../../features/shipments/lifecycle';
 import { LifecycleBadge, whatsappToPhone } from '../../features/shipments/ShipmentBits';
+import { ShipmentCredentialCard, ShipmentReceipt } from '../../features/shipments/ShipmentCredential';
+import { confirmShipmentExists } from '../../services/shipmentWorkflowService';
 import { buildTimeline } from '../../features/shipments/timeline';
 import { paymentLabels } from '../../features/shipments/types';
 import type { RoutePoint, ShipmentRoute } from '../../features/shipments/types';
@@ -19,7 +21,7 @@ import { WhatsAppIcon } from '../../features/whatsapp/WhatsAppSupport';
 import { addShipmentUpdate, draftFromShipment, publishShipment, setRouteProgress, setShipmentRoute, softDeleteShipment, transitionShipment } from '../../services/shipmentWorkflowService';
 import { toRoutePoint } from '../../services/locationService';
 import { formatTrackingNumber } from '../../services/trackingService';
-import type { ShipmentWithCheckpoints } from '../../types/database';
+import type { Shipment, ShipmentWithCheckpoints } from '../../types/database';
 
 type Tab = 'overview' | 'tracking' | 'route' | 'customer' | 'photos' | 'history';
 const tabs: { id: Tab; label: string; icon: typeof Package }[] = [
@@ -27,7 +29,7 @@ const tabs: { id: Tab; label: string; icon: typeof Package }[] = [
   { id: 'customer', label: 'Customer', icon: UserRound }, { id: 'photos', label: 'Photos & Documents', icon: ImageIcon }, { id: 'history', label: 'History', icon: History },
 ];
 type HistoryRow = { id: string; previous_status: string | null; new_status: string; customer_visible_reason: string | null; created_at: string };
-type Done = { action: LifecycleAction; reason: string; trackingNumber?: string };
+type Done = { action: LifecycleAction; reason: string; trackingNumber?: string; published?: Shipment };
 
 const when = (value?: string | null) => value ? new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : 'Not set';
 const money = (currency?: string, value?: number | null) => value != null ? `${currency || 'USD'} ${Number(value).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : 'Not provided';
@@ -61,7 +63,13 @@ function ActionDialog({ action, shipment, onClose, onDone }: { action: Lifecycle
     if (blocked) return;
     setBusy(true); setError('');
     try {
-      if (action === 'publish') onDone({ action, reason: '', trackingNumber: await publishShipment(shipment.id) });
+      if (action === 'publish') {
+        const issued = await publishShipment(shipment.id);
+        // The card is built from the stored record, never from this response.
+        const stored = await confirmShipmentExists(shipment.id);
+        if (!stored.tracking_number) throw new Error('The shipment was published but no tracking number was recorded. Please reload and check.');
+        onDone({ action, reason: '', trackingNumber: stored.tracking_number || issued, published: stored });
+      }
       else { await transitionShipment(shipment.id, action, finalReason); onDone({ action, reason: finalReason.trim() }); }
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'That did not work. Please try again.'); setBusy(false); }
   };
@@ -90,6 +98,7 @@ export default function AdminShipmentDetail() {
   const [tab, setTab] = useState<Tab>(requestedTab && tabs.some(item => item.id === requestedTab) ? requestedTab : 'overview');
   const [dialog, setDialog] = useState<LifecycleAction | null>(null);
   const [done, setDone] = useState<Done | null>(null);
+  const [receiptOpen, setReceiptOpen] = useState(params.get('receipt') === '1');
   const [notice, setNotice] = useState(params.get('created') ? 'Shipment created and scheduled. Publish it when you are ready to issue the tracking number.' : params.get('saved') ? 'Changes saved.' : '');
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [update, setUpdate] = useState<{ title: string; location: string; point: RoutePoint | null }>({ title: '', location: '', point: null });
@@ -165,9 +174,10 @@ export default function AdminShipmentDetail() {
     </section>
 
     {notice && <p className="dhl-admin-banner" role="status">{notice}</p>}
-    {done && <div className="dhl-admin-card dhl-control-done" role="status">
+    {done?.action === 'publish' && done.published && <ShipmentCredentialCard shipment={done.published} onViewReceipt={() => setReceiptOpen(true)} onDismiss={() => setDone(null)} />}
+    {done && done.action !== 'publish' && <div className="dhl-admin-card dhl-control-done" role="status">
       <CheckCircle2 size={22} />
-      <div><strong>{done.action === 'publish' ? `Published · tracking number ${formatTrackingNumber(done.trackingNumber || trackingNumber)}` : `${actionRules[done.action].label.replace(' Shipment', '')} complete · ${lifecycleLabels[state]}`}</strong><span>Customers see the change on the tracking page. Email goes out automatically when email notifications are configured. WhatsApp is not sent automatically.</span></div>
+      <div><strong>{`${actionRules[done.action].label.replace(' Shipment', '')} complete · ${lifecycleLabels[state]}`}</strong><span>Customers see the change on the tracking page. Email goes out automatically when email notifications are configured. WhatsApp is not sent automatically.</span></div>
       {whatsappUpdate && <a className="dhl-admin-button whatsapp" href={whatsappUpdate} target="_blank" rel="noopener noreferrer"><WhatsAppIcon size={15} />Send Update on WhatsApp</a>}
       <button type="button" className="dhl-control-dismiss" onClick={() => setDone(null)} aria-label="Dismiss"><X size={16} /></button>
     </div>}
@@ -177,6 +187,7 @@ export default function AdminShipmentDetail() {
       <div>
         {primary.map(action => <button key={action} type="button" className="dhl-admin-button primary" onClick={() => setDialog(action)}>{actionRules[action].label}</button>)}
         {['draft', 'scheduled', 'awaiting_takeoff'].includes(state) && <Link className="dhl-admin-button" to={`/admin/shipments/${shipment.id}/edit`}><Pencil size={15} />Edit Shipment</Link>}
+        <button type="button" className="dhl-admin-button" onClick={() => setReceiptOpen(true)}><FileText size={15} />View Receipt</button>
         {secondary.map(action => <button key={action} type="button" className={`dhl-admin-button${actionRules[action].tone === 'danger' ? ' danger' : ''}`} onClick={() => setDialog(action)}>{actionRules[action].label}</button>)}
         {published && <Link className="dhl-admin-button" to={`/admin/chat?tracking=${encodeURIComponent(shipment.id)}`}><MessageCircle size={15} />Contact Customer</Link>}
         {canSoftDelete(state) && <button type="button" className="dhl-admin-button danger" onClick={() => void remove()} disabled={deleting}><Trash2 size={15} />{deleting ? 'Deleting…' : 'Delete'}</button>}
@@ -264,5 +275,6 @@ export default function AdminShipmentDetail() {
     </div>}
 
     {dialog && <ActionDialog action={dialog} shipment={shipment} onClose={() => setDialog(null)} onDone={result => { setDialog(null); setDone(result); setNotice(''); }} />}
+    {receiptOpen && <ShipmentReceipt shipment={(done?.published || shipment) as Shipment} onClose={() => setReceiptOpen(false)} />}
   </div>;
 }

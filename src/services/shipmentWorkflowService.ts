@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
-import { uploadImage } from './shipmentService';
-import { addDevShipmentUpdate, createDevShipment, devDataEnabled, isDevShipmentId, softDeleteDevShipment, transitionDevShipment, updateDevShipment } from '../demo/devDataStore';
+import { uploadImageToPath } from './shipmentService';
+import { addDevShipmentUpdate, createDevShipment, devDataEnabled, findDevShipment, isDevShipmentId, softDeleteDevShipment, transitionDevShipment, updateDevShipment } from '../demo/devDataStore';
 import type { LifecycleAction } from '../features/shipments/lifecycle';
 import type { RoutePoint, ShipmentDraft, ShipmentRoute } from '../features/shipments/types';
 import type { Shipment } from '../types/database';
@@ -17,7 +17,30 @@ import type { Shipment } from '../types/database';
  * is signed in (dev bypass), records live in src/demo/devDataStore.ts.
  */
 
-export type PackagePhoto = { id: string; url: string; file?: File };
+export type PhotoStatus = 'uploading' | 'uploaded' | 'failed';
+
+/**
+ * A package image in the form. `url` is what the browser shows and what the
+ * shipment record stores; `path` is the Supabase Storage object key, kept so
+ * the image can be removed again. `file` exists only between choosing a file
+ * and a successful upload (and for a retry), and is never persisted.
+ */
+export type PackagePhoto = { id: string; url: string; path?: string; name?: string; status?: PhotoStatus; error?: string; file?: File };
+
+export const PACKAGE_IMAGE_BUCKET = 'shipment-images';
+export const PACKAGE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+/** Matches the shipment-images bucket limit set in migration 20260929000000. */
+export const PACKAGE_IMAGE_MAX_BYTES = 10 * 1024 * 1024;
+
+const extensionFor = (file: File) => ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' } as Record<string, string>)[file.type] || 'bin';
+
+/**
+ * Deterministic, admin-scoped object key. The folder is the draft id, which
+ * becomes the shipment id on creation, so an image uploaded during the wizard
+ * already sits at its permanent location and never needs to be moved.
+ */
+export const packagePhotoPath = (scope: 'shipments' | 'requests', draftId: string, photoId: string, file: File) =>
+  `${scope}/${draftId}/${photoId}.${extensionFor(file)}`;
 
 const MIGRATION_HINT = 'This action needs the shipment-lifecycle migration (20260926000000), applied during deployment.';
 
@@ -106,33 +129,78 @@ async function toCompactDataUrl(file: File, maxSize = 1280): Promise<string> {
 }
 
 /**
- * Resolves the uploader's photos to stored URLs in their current order:
- * existing URLs are kept, new files are uploaded to the shipment-images bucket
- * (or stored compactly in development).
+ * Uploads one chosen image straight away, so the form can survive a refresh
+ * and so a storage problem surfaces while the admin is still on that step
+ * rather than at submit. Returns the photo with its canonical reference, or
+ * with status 'failed' and a readable reason.
  */
-export async function storePackagePhotos(photos: PackagePhoto[], folder: string, development: boolean): Promise<string[]> {
-  const urls: string[] = [];
-  const uploadedPaths: string[] = [];
+export async function uploadPackagePhoto(photo: PackagePhoto, scope: 'shipments' | 'requests', draftId: string): Promise<PackagePhoto> {
+  const file = photo.file;
+  if (!file) return { ...photo, status: 'uploaded' };
+  if (await usesDevelopmentWrites()) {
+    try { return { ...photo, url: await toCompactDataUrl(file), file: undefined, status: 'uploaded' }; }
+    catch { return { ...photo, status: 'failed', error: 'The image could not be prepared.' }; }
+  }
+  const path = packagePhotoPath(scope, draftId, photo.id, file);
+  const { url, error } = await uploadImageToPath(PACKAGE_IMAGE_BUCKET, file, path);
+  if (error || !url) {
+    if (import.meta.env.DEV) console.warn('Package image upload failed:', { path, error });
+    return { ...photo, status: 'failed', error: uploadMessage(error) };
+  }
+  return { ...photo, url, path, file: undefined, status: 'uploaded', error: undefined };
+}
+
+/**
+ * Removes a draft image so a discarded or replaced picture leaves nothing
+ * behind. storage-api answers 200 with an empty list when RLS hides the row,
+ * so an empty result is reported rather than treated as success.
+ */
+export async function removePackagePhoto(photo: PackagePhoto): Promise<boolean> {
+  if (!photo.path) return true;
   try {
-    for (const photo of photos) {
-      if (!photo.file) { urls.push(photo.url); continue; }
-      if (development) { urls.push(await toCompactDataUrl(photo.file)); continue; }
-      const { url, path, error } = await uploadImage('shipment-images', photo.file, folder);
-      if (error || !url || !path) throw new Error(`“${photo.file.name}” could not be uploaded. Please try again.`);
-      uploadedPaths.push(path); urls.push(url);
-    }
-    return urls;
+    const { data, error } = await supabase.storage.from(PACKAGE_IMAGE_BUCKET).remove([photo.path]);
+    const removed = !error && Array.isArray(data) && data.length > 0;
+    if (!removed && import.meta.env.DEV) console.warn('Package image was not removed from storage:', { path: photo.path, error });
+    return removed;
   } catch (cause) {
-    if (!development && uploadedPaths.length) await supabase.storage.from('shipment-images').remove(uploadedPaths);
-    throw cause;
+    if (import.meta.env.DEV) console.warn('Package image removal failed:', cause);
+    return false;
   }
 }
 
-/** Creates a SCHEDULED shipment. Nothing is published or moving yet. */
-export async function createScheduledShipment(draft: ShipmentDraft, photos: PackagePhoto[]): Promise<string> {
-  const id = crypto.randomUUID();
+function uploadMessage(error: string | null): string {
+  const text = error || '';
+  if (/row-level security|Unauthorized|AccessDenied/i.test(text)) return 'Storage refused this upload. Sign in with the administrator account and try again.';
+  if (/mime type|InvalidMimeType/i.test(text)) return 'That file type is not accepted. Use JPEG, PNG or WebP.';
+  if (/exceeded the maximum|EntityTooLarge|Payload too large/i.test(text)) return 'That image is larger than 10 MB.';
+  if (/Bucket not found/i.test(text)) return 'The shipment-images bucket is missing from this Supabase project.';
+  if (/timed out|Failed to fetch|NetworkError/i.test(text)) return 'The upload could not reach storage. Check the connection and retry.';
+  return text || 'Could not upload. Please try again.';
+}
+
+/**
+ * Every photo must already be stored before a shipment is written, so no
+ * blob:, data: or local path can ever reach the database.
+ */
+export function packagePhotoUrls(photos: PackagePhoto[]): string[] {
+  const pending = photos.filter(photo => photo.status === 'uploading');
+  if (pending.length) throw new Error('Wait for the package images to finish uploading.');
+  const failed = photos.filter(photo => photo.status === 'failed' || !photo.url);
+  if (failed.length) throw new Error('Retry or remove the images that failed to upload.');
+  const local = photos.filter(photo => /^(blob:|data:)/i.test(photo.url) && !photo.url.startsWith('data:image/'));
+  if (local.length) throw new Error('Some images are still only in this browser. Re-add them and wait for the upload.');
+  return photos.map(photo => photo.url);
+}
+
+/**
+ * Creates a SCHEDULED shipment. Nothing is published or moving yet.
+ * `draftId` is the id the wizard already used as the image folder, so the
+ * uploaded objects belong to this shipment from the start.
+ */
+export async function createScheduledShipment(draft: ShipmentDraft, photos: PackagePhoto[], draftId?: string): Promise<string> {
+  const id = draftId || crypto.randomUUID();
   const development = await usesDevelopmentWrites();
-  const images = await storePackagePhotos(photos, id, development);
+  const images = packagePhotoUrls(photos);
   const row = { ...draftToRow({ ...draft, images }), id };
   if (development) return createDevShipment(row).id;
 
@@ -154,9 +222,26 @@ export async function createScheduledShipment(draft: ShipmentDraft, photos: Pack
   return id;
 }
 
+/**
+ * Reads the shipment back from the database after creating it. The draft is
+ * only discarded once this succeeds, so a write that silently did not land
+ * never costs the admin their work.
+ */
+export async function confirmShipmentExists(id: string): Promise<Shipment> {
+  if (isDevShipmentId(id)) {
+    const row = findDevShipment(id);
+    if (!row) throw new Error('The shipment could not be confirmed. Your draft has been kept.');
+    return row as Shipment;
+  }
+  const { data, error } = await supabase.from('shipments').select('*').eq('id', id).limit(1);
+  const row = (data as Shipment[] | null)?.[0];
+  if (error || !row) throw new Error('The shipment was not found after saving. Your draft has been kept — please try again.');
+  return row;
+}
+
 export async function updateShipmentDetails(id: string, draft: ShipmentDraft, photos: PackagePhoto[]): Promise<void> {
   const development = isDevShipmentId(id);
-  const images = await storePackagePhotos(photos, id, development);
+  const images = packagePhotoUrls(photos);
   const row = draftToRow({ ...draft, images });
   if (development) { updateDevShipment(id, row); return; }
   const { error } = await supabase.from('shipments').update(row).eq('id', id);

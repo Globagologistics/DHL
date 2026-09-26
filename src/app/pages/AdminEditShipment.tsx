@@ -22,7 +22,7 @@ export default function AdminEditShipment() {
   return <div className="dhl-admin-create">
     <div className="dhl-admin-page-head"><div><span className="dhl-admin-eyebrow">SHIPMENT OPERATIONS</span><h1>Edit Shipment</h1><p>{shipment.package_name || 'Shipment'} · changes apply before the shipment starts.</p></div><Link className="dhl-admin-button" to={`/admin/shipments/${shipment.id}`}>Back to Control Panel</Link></div>
     {editable
-      ? <ShipmentWizard mode="admin" initial={initial} initialPhotos={photos} startStep={4} submitLabel="Save Changes" submitting={submitting} submitError={error}
+      ? <ShipmentWizard mode="admin" initial={initial} initialPhotos={photos} draftId={shipment.id} startStep={4} submitLabel="Save Changes" submitting={submitting} submitError={error}
           onSubmit={async (draft, next) => {
             setSubmitting(true); setError('');
             try { await updateShipmentDetails(shipment.id, draft, next); navigate(`/admin/shipments/${shipment.id}?saved=1`); }

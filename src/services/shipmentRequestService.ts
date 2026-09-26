@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { approveDevRequest, devDataEnabled, isDevRequestId, listDevRequests, rejectDevRequest, submitDevRequest, updateDevRequest } from '../demo/devDataStore';
-import { draftToRow, storePackagePhotos } from './shipmentWorkflowService';
+import { draftToRow, packagePhotoUrls } from './shipmentWorkflowService';
 import type { PackagePhoto } from './shipmentWorkflowService';
 import type { ShipmentDraft, ShipmentRequest, ShipmentRequestPayload } from '../features/shipments/types';
 
@@ -28,7 +28,7 @@ export function requestPayloadFromDraft(draft: ShipmentDraft, images: string[]):
 
 export async function submitShipmentRequest(draft: ShipmentDraft, photos: PackagePhoto[]): Promise<string> {
   const development = devDataEnabled();
-  const images = await storePackagePhotos(photos, `requests/${crypto.randomUUID()}`, development);
+  const images = packagePhotoUrls(photos);
   const payload = requestPayloadFromDraft(draft, images);
   if (development) return submitDevRequest(payload);
   const { data, error } = await supabase.rpc('submit_shipment_request', { p_payload: payload });
