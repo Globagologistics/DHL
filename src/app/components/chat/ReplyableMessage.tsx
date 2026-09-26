@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import type { PointerEvent as ReactPointerEvent } from 'react';
 import { CornerUpLeft, EyeOff, Headphones, MoreHorizontal, Trash2, UserRound } from 'lucide-react';
-import type { ChatMessage, ChatRole } from '../../../types/chat';
+import type { ChatMessage, ChatRole, MediaAttachment } from '../../../types/chat';
 import { supportAgentFor } from '../../../config/supportAgents';
+import { ChatImageViewer } from './ChatImageViewer';
 import { QuotedReply, replyLabel } from './ReplyElements';
 
 type Props = {
@@ -26,6 +27,7 @@ const time = (value: number) => new Date(value).toLocaleTimeString([], { hour: '
 export function ReplyableMessage({ message, activeRole, onReply, onDelete, className = '', avatarClassName = '', compact = false }: Props) {
   const [offset, setOffset] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [viewing, setViewing] = useState<MediaAttachment | null>(null);
   const start = useRef<{ x: number; y: number; locked: boolean } | null>(null);
   const longPress = useRef<number | null>(null);
   const isMine = message.sender === activeRole;
@@ -73,13 +75,18 @@ export function ReplyableMessage({ message, activeRole, onReply, onDelete, class
         <div className="dhl-chat-bubble">
           {message.replyToMessageId && <QuotedReply message={message.replyTo} />}
           {message.text && <span className="dhl-chat-message-text">{message.text}</span>}
-          {message.media?.map(media => media.type === 'video' ? <video className="dhl-chat-attachment" controls src={media.url} key={media.id} /> : <a href={media.url} target="_blank" rel="noreferrer" key={media.id}><img className="dhl-chat-attachment" src={media.url} alt={media.name || 'Chat attachment'} /></a>)}
+          {message.media?.map(media => media.type === 'video'
+            ? <video className="dhl-chat-attachment" controls src={media.url} key={media.id} />
+            : <button type="button" className="dhl-chat-attachment-button" key={media.id} onClick={() => setViewing(media)} aria-label={`Open ${media.name || 'image'} full screen`}>
+                <img className="dhl-chat-attachment" src={media.url} alt={media.name || 'Chat attachment'}/>
+              </button>)}
           <span className="dhl-message-actions">
             <button type="button" className="dhl-message-reply-button" onClick={() => onReply(message)} aria-label={`Reply to ${replyLabel(message)}`}><CornerUpLeft size={15} /></button>
             {canDelete && <button type="button" className="dhl-message-more-button" onClick={() => setMenuOpen(open => !open)} aria-label="Message actions" aria-expanded={menuOpen}><MoreHorizontal size={15} /></button>}
           </span>
         </div>
         <small>{time(message.createdAt)}</small>
+        {viewing && <ChatImageViewer media={viewing} onClose={() => setViewing(null)} />}
         {menuOpen && <div className="dhl-message-menu" role="menu">
           <button type="button" role="menuitem" onClick={() => { setMenuOpen(false); onReply(message); }}><CornerUpLeft size={15} /> Reply</button>
           {canDelete && <button type="button" role="menuitem" className="danger" onClick={() => { setMenuOpen(false); onDelete?.(message); }}><Trash2 size={15} /> Delete Message</button>}

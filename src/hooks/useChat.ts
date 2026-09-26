@@ -104,6 +104,15 @@ const makeFileId = () => {
   }
 };
 
+/** Keeps object keys predictable: the policy matches on the leading shipment id. */
+const safeMediaName = (name: string) =>
+  (name.normalize('NFKD').replace(/[^\w.-]+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '') || 'attachment').slice(-80);
+
+/**
+ * chat-media is a private bucket. Only the object path is durable; a viewable
+ * URL is signed on demand by hydrateChatMedia, so an old message keeps working
+ * long after any particular signed link has expired.
+ */
 const uploadChatMedia = async (
   files: File[],
   trackingId: string
@@ -113,14 +122,14 @@ const uploadChatMedia = async (
   const uploaded = await Promise.all(
     files.map(async (file) => {
       const fileId = makeFileId();
-      const filePath = `${trackingId}/${fileId}-${file.name}`;
+      const filePath = `${trackingId}/${fileId}-${safeMediaName(file.name)}`;
       const { error } = await supabase.storage
         .from(CHAT_MEDIA_BUCKET)
-        .upload(filePath, file, { upsert: false });
+        .upload(filePath, file, { upsert: false, contentType: file.type || undefined });
 
       if (error) {
-        console.error("Failed to upload chat media:", error);
-        return null;
+        if (import.meta.env.DEV) console.warn("Failed to upload chat media:", { filePath, error });
+        throw new Error('ATTACHMENT_UPLOAD_FAILED');
       }
 
       return {
@@ -135,6 +144,62 @@ const uploadChatMedia = async (
 
   return uploaded.filter(Boolean) as MediaAttachment[];
 };
+
+/**
+ * Customer-facing wording. The raw Postgres/PostgREST text (for example
+ * "new row violates row-level security policy") never reaches a customer.
+ */
+const CHAT_SEND_FAILED = "Your message couldn't be sent. Please try again.";
+function friendlyChatError(error: { message?: string; code?: string } | null, viewer: ChatRole): string {
+  const message = error?.message || '';
+  if (message === 'ATTACHMENT_UPLOAD_FAILED') return 'The attachment could not be uploaded. Please try again.';
+  if (/not authorized to write|Admin access required|42501|row-level security/i.test(message + (error?.code || ''))) {
+    return viewer === 'admin'
+      ? 'This conversation could not be written to with the signed-in account.'
+      : 'This conversation is no longer available for your account.';
+  }
+  if (/Message is empty/i.test(message)) return 'Write a message first.';
+  if (/too long/i.test(message)) return 'That message is too long.';
+  if (/Conversation was not found/i.test(message)) return 'This conversation could not be found.';
+  if (/quoted message/i.test(message)) return 'The quoted message is no longer part of this conversation.';
+  if (/Attachment/i.test(message)) return 'That attachment could not be attached to this conversation.';
+  return CHAT_SEND_FAILED;
+}
+
+/**
+ * Downloads the original attachment through the private bucket, so the file
+ * the viewer saves is the authorized object rather than a screenshot of it.
+ * Returns null on success, or a message to show.
+ */
+export async function downloadChatAttachment(media: MediaAttachment): Promise<string | null> {
+  const fallbackName = media.name?.trim() || 'chat-attachment';
+  try {
+    let blob: Blob | null = null;
+    if (media.storagePath) {
+      const { data, error } = await supabase.storage.from(CHAT_MEDIA_BUCKET).download(media.storagePath);
+      if (error || !data) throw error || new Error('Attachment unavailable');
+      blob = data as Blob;
+    } else {
+      // Legacy messages stored a direct URL instead of an object path.
+      const response = await fetch(media.url);
+      if (!response.ok) throw new Error(`Attachment request failed (${response.status})`);
+      blob = await response.blob();
+    }
+    const href = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = href;
+    link.download = fallbackName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    // Revoke after the browser has started the download.
+    window.setTimeout(() => URL.revokeObjectURL(href), 20_000);
+    return null;
+  } catch (cause) {
+    if (import.meta.env.DEV) console.warn('Attachment download failed:', cause);
+    return 'The image could not be downloaded. Please try again.';
+  }
+}
 
 export async function ensureChatThread(trackingId: string): Promise<ChatThreadSummary | null> {
   const trimmed = trackingId.trim();
@@ -190,14 +255,38 @@ export async function sendChatMessage(payload: {
     return { data: null, error: "Failed to create chat thread" };
   }
 
-  const uploads = payload.mediaFiles
-    ? await uploadChatMedia(payload.mediaFiles, trimmed)
-    : [];
+  let uploads: MediaAttachment[] = [];
+  try {
+    uploads = payload.mediaFiles ? await uploadChatMedia(payload.mediaFiles, trimmed) : [];
+  } catch (cause) {
+    return { data: null, error: friendlyChatError(cause as { message?: string }, payload.sender) };
+  }
   const combinedMedia = [...(payload.media || []), ...uploads];
   const cleanedText = payload.text?.trimEnd() || null;
 
   if (!cleanedText && combinedMedia.length === 0) {
     return { data: null, error: "Message is empty" };
+  }
+
+  /**
+   * Customers never write to chat_messages directly. send_customer_chat_message
+   * decides the sender role itself, so the browser cannot propose 'admin', and
+   * it re-checks that the caller really is this thread's participant.
+   */
+  if (payload.sender === 'user') {
+    const { data: sent, error: rpcError } = await supabase
+      .rpc('send_customer_chat_message', {
+        p_thread_id: thread.id,
+        p_text: cleanedText,
+        p_media: combinedMedia,
+        p_reply_to_message_id: payload.replyToMessageId || null,
+      })
+      .single();
+    if (rpcError || !sent) {
+      if (import.meta.env.DEV) console.warn('Customer message was rejected:', rpcError);
+      return { data: null, error: friendlyChatError(rpcError, 'user') };
+    }
+    return { data: await hydrateMessage(toMessage(sent as ChatMessageRow)), error: null };
   }
 
   const insertRow = {
@@ -227,8 +316,8 @@ export async function sendChatMessage(payload: {
   }
 
   if (error) {
-    console.error("Failed to send chat message:", error);
-    return { data: null, error: error.message };
+    if (import.meta.env.DEV) console.warn("Failed to send chat message:", error);
+    return { data: null, error: friendlyChatError(error, payload.sender) };
   }
 
   return { data: await hydrateMessage(toMessage(data as ChatMessageRow)), error: null };

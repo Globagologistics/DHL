@@ -151,8 +151,12 @@ function Conversation({ threadId }: { threadId: string }) {
   const bottom = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLDivElement>(null);
   const agent = activeSupportAgent();
+  const { isAdmin } = useContext(AdminContext);
   const isDev = isDemoThreadId(threadId);
-  const locked = environment.devAdminBypass && !isDev;
+  // The development bypass exists so an unauthenticated developer cannot write
+  // to production conversations. A real administrator session is not a bypass,
+  // so it stays free to reply.
+  const locked = environment.devAdminBypass && !isAdmin && !isDev;
 
   useEffect(() => { if (thread) void markThreadRead(thread.id, 'admin'); }, [thread?.id, messages.length]); // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (following) bottom.current?.scrollIntoView({ block: 'end' }); else if (messages.length) setNewCount(count => count + 1); }, [messages.length]); // eslint-disable-line react-hooks/exhaustive-deps

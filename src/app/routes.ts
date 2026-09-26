@@ -14,6 +14,7 @@ import SignIn from "./pages/SignIn";
 import SignUp from "./pages/SignUp";
 import ResetPassword from "./pages/ResetPassword";
 import NotFound from "./pages/NotFound";
+import { Privacy, Terms } from "./pages/Legal";
 import { AdminRouteGuard } from "./pages/AdminRouteGuard";
 import AdminForm from "./pages/AdminForm";
 import AdminDetail from "./pages/AdminDetail";
@@ -50,6 +51,8 @@ export const router = createBrowserRouter([
       { path: "locations", Component: Locations },
       { path: "solutions", Component: Solutions },
       { path: "about", Component: About },
+      { path: "terms", Component: Terms },
+      { path: "privacy", Component: Privacy },
       { path: "signin", Component: SignIn },
       { path: "signup", Component: SignUp },
       { path: "reset-password", Component: ResetPassword },

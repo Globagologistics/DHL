@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Bell, ChevronRight, Headphones, Home, Menu, MoreHorizontal, Package, Search, Settings, ShieldQuestion, UserRound, X } from 'lucide-react';
+import { Bell, ChevronRight, Headphones, Home, Menu, MoreHorizontal, Package, Scale, Search, Settings, ShieldCheck, ShieldQuestion, UserRound, X } from 'lucide-react';
 import { appConfig } from '../../../config/app';
 import { TrackingNumberInput } from '../../../features/tracking/TrackingNumberInput';
 import { AUTO_LOOKUP_DEBOUNCE_MS } from '../../../features/tracking/useTrackingLookup';
@@ -18,6 +18,11 @@ const secondaryLinks = [
   { label: 'Notifications', path: '/settings#notifications', icon: Bell },
   { label: 'Settings', path: '/settings', icon: Settings },
   { label: 'Help Center', path: '/chat', icon: ShieldQuestion },
+];
+/** Customer-facing legal entries. Labels follow the interface language. */
+const legalLinks = [
+  { key: 'terms' as const, path: '/terms', icon: Scale },
+  { key: 'privacy' as const, path: '/privacy', icon: ShieldCheck },
 ];
 
 export function BrandLogo({ unboxed = false }: { unboxed?: boolean }) {
@@ -66,6 +71,7 @@ export function CustomerShell({ children }: { children: React.ReactNode }) {
           {primaryLinks.map(({ label, path, icon: Icon }) => <Link key={label} to={path} onClick={() => setDrawerOpen(false)}><span className="dhl-drawer-link-icon"><Icon size={18}/></span><span>{label}</span><ChevronRight size={16}/></Link>)}
           <WhatsAppSupportButton trackingId={recentTrackingNumber()} className="dhl-drawer-whatsapp"><span className="dhl-drawer-link-icon whatsapp"><WhatsAppIcon size={18}/></span><span>{t('whatsapp')}</span><ChevronRight size={16}/></WhatsAppSupportButton>
           {secondaryLinks.map(({ label, path, icon: Icon }) => <Link key={label} to={path} onClick={() => setDrawerOpen(false)}><span className="dhl-drawer-link-icon"><Icon size={18}/></span><span>{label}</span><ChevronRight size={16}/></Link>)}
+          {legalLinks.map(({ key, path, icon: Icon }) => <Link key={key} to={path} onClick={() => setDrawerOpen(false)}><span className="dhl-drawer-link-icon"><Icon size={18}/></span><span>{t(key)}</span><ChevronRight size={16}/></Link>)}
         </nav>
         <label className="dhl-drawer-language"><span>{t('language')}</span><select value={language} onChange={event => setLanguage(event.target.value as typeof language)} aria-label={t('language')}>{languages.map(item => <option key={item.code} value={item.code}>{item.label}</option>)}</select></label>
         <Link className="dhl-drawer-signin" to="/signin" onClick={() => setDrawerOpen(false)}><UserRound size={18}/> {t('signIn')}</Link>

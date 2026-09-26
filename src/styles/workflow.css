@@ -294,9 +294,13 @@ html.dhl-scroll-locked, html.dhl-scroll-locked body { overflow: hidden; overscro
 .dhl-chat-context-body .dhl-route-facts { grid-template-columns: 1fr 1fr; }
 
 /* Message actions + deletion marker */
-.dhl-message-actions { position: absolute; top: 6px; right: 6px; display: flex; gap: 4px; opacity: 0; transition: opacity 150ms ease; }
+/* Beside the bubble, never on top of it: the actions sit in the gutter on the
+   bubble's outer side, so they cannot cover message text or an image. */
+.dhl-message-actions { position: absolute; top: 50%; left: calc(100% + 6px); right: auto; transform: translateY(-50%); display: flex; gap: 4px; opacity: 0; transition: opacity 150ms ease; }
+.dhl-replyable-message.mine .dhl-message-actions { left: auto; right: calc(100% + 6px); }
 .dhl-replyable-message:hover .dhl-message-actions, .dhl-message-actions:focus-within { opacity: 1; }
 .dhl-message-actions .dhl-message-reply-button { position: static; opacity: 1; }
+.dhl-message-actions .dhl-message-reply-button, .dhl-message-more-button { border: 1px solid rgba(25, 25, 25, .1); background: #fff; box-shadow: 0 2px 8px rgba(0, 0, 0, .12); }
 .dhl-message-more-button { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .86); color: #1d1d1b; cursor: pointer; }
 .dhl-message-menu { position: relative; z-index: 5; display: grid; gap: 2px; width: max-content; margin-top: 6px; padding: 5px; border: 1px solid #e4e6e8; border-radius: 12px; background: #fff; box-shadow: 0 12px 30px rgba(0, 0, 0, .14); }
 .dhl-replyable-message.mine .dhl-message-menu { margin-left: auto; }
@@ -443,3 +447,10 @@ html.dhl-scroll-locked, html.dhl-scroll-locked body { overflow: hidden; overscro
   .dhl-receipt-body { overflow: visible; }
   .dhl-receipt-head button, .dhl-receipt-actions { display: none; }
 }
+
+/* Delete-shipment confirmation facts. */
+.dhl-delete-facts { display: grid; gap: 0; margin: 16px 0 4px; }
+.dhl-delete-facts div { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; min-width: 0; padding: 9px 0; border-top: 1px solid #edf0f1; }
+.dhl-delete-facts dt { flex: 0 0 auto; color: #85898f; font-size: 10px; font-weight: 800; letter-spacing: .07em; text-transform: uppercase; }
+.dhl-delete-facts dd { margin: 0; min-width: 0; color: #1d1d1b; font-size: 13px; font-weight: 700; text-align: right; overflow-wrap: anywhere; }
+.dhl-delete-facts dd.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; letter-spacing: .04em; }

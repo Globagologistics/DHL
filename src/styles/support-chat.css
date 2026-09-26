@@ -457,8 +457,32 @@
 .dhl-typing-dots i:nth-child(2) { animation-delay: 150ms; }
 .dhl-typing-dots i:nth-child(3) { animation-delay: 300ms; }
 
-.dhl-chat-selected-file { padding: 7px 20px; background: #fff; color: var(--dhl-secondary); font-size: 12px; }
-.dhl-chat-selected-file button { margin-left: 8px; border: 0; background: none; color: var(--dhl-red); font-weight: 800; cursor: pointer; }
+/* Chosen attachment: the picture itself, not its filename. */
+.dhl-chat-attachment-preview { position: relative; width: fit-content; max-width: min(240px, 60%); margin: 8px 16px; }
+.dhl-chat-attachment-preview img, .dhl-chat-attachment-preview video { display: block; width: 100%; max-width: 100%; height: auto; max-height: 190px; border: 1px solid var(--dhl-border, #e4e6e8); border-radius: 14px; object-fit: contain; background: #f2f3f4; }
+.dhl-chat-attachment-remove { position: absolute; top: 6px; right: 6px; display: grid; place-items: center; width: 28px; height: 28px; border: 0; border-radius: 50%; background: rgba(15, 15, 15, .72); color: #fff; cursor: pointer; }
+.dhl-chat-attachment-remove:hover { background: rgba(15, 15, 15, .88); }
+.dhl-chat-attachment-sending { position: absolute; left: 6px; bottom: 6px; padding: 3px 8px; border-radius: 99px; background: rgba(15, 15, 15, .72); color: #fff; font-size: 10.5px; font-weight: 800; }
+
+/* Sent attachment: a tappable image that opens the viewer. */
+/* The bubble shrink-wraps its content, so a percentage width here would be
+   circular and collapse. Absolute caps keep the image intrinsic and contained. */
+.dhl-chat-attachment-button { display: block; width: fit-content; min-width: 0; max-width: min(320px, 62vw); margin-top: 8px; padding: 0; border: 0; border-radius: 12px; background: transparent; cursor: zoom-in; }
+.dhl-chat-attachment-button .dhl-chat-attachment { display: block; width: auto; max-width: 100%; height: auto; max-height: 380px; margin: 0; border-radius: 12px; background: rgba(0, 0, 0, .05); }
+.dhl-chat-attachment-button:focus-visible { outline: 3px solid var(--dhl-red, #d40511); outline-offset: 2px; }
+
+/* Full-screen viewer. */
+.dhl-image-viewer { position: fixed; inset: 0; z-index: 200; display: grid; grid-template-rows: auto 1fr; gap: 10px; padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom)); background: rgba(8, 8, 10, .93); overscroll-behavior: contain; }
+.dhl-image-viewer-bar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+.dhl-image-viewer-action { display: inline-flex; align-items: center; gap: 7px; min-height: 40px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, .28); border-radius: 10px; background: rgba(255, 255, 255, .1); color: #fff; font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.dhl-image-viewer-action:hover:not(:disabled) { background: rgba(255, 255, 255, .2); }
+.dhl-image-viewer-action:disabled { opacity: .6; cursor: progress; }
+.dhl-image-viewer-close { display: grid; place-items: center; flex: 0 0 40px; width: 40px; height: 40px; border: 1px solid rgba(255, 255, 255, .28); border-radius: 10px; background: rgba(255, 255, 255, .1); color: #fff; cursor: pointer; }
+.dhl-image-viewer-media { display: block; place-self: center; max-width: 100%; max-height: 100%; width: auto; height: auto; border-radius: 10px; object-fit: contain; }
+.dhl-image-viewer-error { position: absolute; left: 50%; bottom: max(18px, env(safe-area-inset-bottom)); transform: translateX(-50%); max-width: min(92vw, 420px); margin: 0; padding: 10px 14px; border-radius: 10px; background: #d40511; color: #fff; font-size: 12.5px; text-align: center; }
+.dhl-image-viewer-spin { animation: dhl-viewer-spin 900ms linear infinite; }
+@keyframes dhl-viewer-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .dhl-image-viewer-spin { animation: none; } }
 .dhl-chat-send-error { margin: 0 !important; padding: 6px 20px; background: #fff; }
 
 .dhl-chat-shell .dhl-chat-composer {
@@ -602,8 +626,9 @@
 .dhl-replyable-message.mine .dhl-reply-swipe-indicator { right:14px; left:auto; }
 .dhl-replyable-message.swiping .dhl-reply-swipe-indicator { opacity:.9; transform:translateY(-50%) scale(1); }
 .dhl-reply-swipe-indicator.ready { background:var(--dhl-red); color:#fff; }
-.dhl-message-reply-button { position:absolute; top:7px; right:7px; display:grid; place-items:center; width:30px; height:30px; border:0; border-radius:50%; background:rgba(255,255,255,.86); color:var(--dhl-red); opacity:0; cursor:pointer; transition:opacity 160ms ease; }
-.dhl-replyable-message.mine .dhl-message-reply-button { background:rgba(255,255,255,.58); }
+.dhl-message-reply-button { position:absolute; top:50%; left:calc(100% + 6px); right:auto; transform:translateY(-50%); display:grid; place-items:center; width:30px; height:30px; border:0; border-radius:50%; background:#fff; box-shadow:0 2px 8px rgba(0,0,0,.12); color:var(--dhl-red); opacity:0; cursor:pointer; transition:opacity 160ms ease; }
+.dhl-replyable-message.mine .dhl-message-reply-button { left:auto; right:calc(100% + 6px); }
+
 .dhl-replyable-message:hover .dhl-message-reply-button,.dhl-message-reply-button:focus-visible { opacity:1; }
 .dhl-reply-quote { display:grid; gap:3px; margin:0 0 8px; padding:7px 9px; border-left:3px solid var(--dhl-red); border-radius:4px 8px 8px 4px; background:rgba(255,255,255,.54); color:var(--dhl-secondary); font-size:11px; line-height:1.35; }
 .dhl-reply-quote strong { color:var(--dhl-text); font-size:11px; }.dhl-reply-quote span { display:flex; align-items:center; gap:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }.dhl-reply-quote.unavailable { color:var(--dhl-muted); }

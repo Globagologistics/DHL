@@ -48,6 +48,42 @@ const guidance: Record<string, string> = {
   terminated: 'Terminated. This is final.',
 };
 
+/**
+ * Soft deletion, confirmed deliberately. The shipment leaves active lists and
+ * public tracking; its chat, status history and images are kept. The permanent
+ * demo shipment is refused here and again by soft_delete_shipment.
+ */
+function DeleteShipmentDialog({ shipment, busy, onClose, onConfirm }: { shipment: ShipmentWithCheckpoints; busy: boolean; onClose: () => void; onConfirm: () => void }) {
+  const [typed, setTyped] = useState('');
+  const tracking = shipment.tracking_number || '';
+  const isDemo = Boolean(shipment.is_demo) || tracking === '010101010101';
+  const expected = tracking || 'DELETE';
+  const blocked = isDemo || busy || typed.trim() !== expected;
+  useEffect(() => { const close = (event: KeyboardEvent) => { if (event.key === 'Escape' && !busy) onClose(); }; window.addEventListener('keydown', close); return () => window.removeEventListener('keydown', close); }, [busy, onClose]);
+  return <div className="dhl-admin-modal-layer" onMouseDown={event => { if (event.target === event.currentTarget && !busy) onClose(); }}>
+    <form className="dhl-admin-confirm dhl-lifecycle-dialog danger" role="dialog" aria-modal="true" aria-labelledby="delete-shipment-title" onSubmit={event => { event.preventDefault(); if (!blocked) onConfirm(); }}>
+      <button type="button" className="dhl-lifecycle-close" onClick={onClose} aria-label="Close" disabled={busy}><X size={18} /></button>
+      <h2 id="delete-shipment-title">Delete Shipment?</h2>
+      <dl className="dhl-delete-facts">
+        <div><dt>Tracking ID</dt><dd className="mono">{tracking ? formatTrackingNumber(tracking) : 'Not issued yet'}</dd></div>
+        <div><dt>Shipment</dt><dd>{shipment.package_name || 'Shipment'}</dd></div>
+        <div><dt>Sender</dt><dd>{shipment.sender_name || '—'}</dd></div>
+        <div><dt>Receiver</dt><dd>{shipment.receiver_name || '—'}</dd></div>
+      </dl>
+      {isDemo
+        ? <p className="dhl-admin-banner error" role="alert">Permanent demo shipment cannot be deleted.</p>
+        : <>
+          <p>This shipment will be removed from active shipment management and public tracking. Its chat history, status history and images are kept for audit.</p>
+          <label className="dhl-admin-form-field"><span>Type {expected} to confirm</span><input value={typed} onChange={event => setTyped(event.target.value)} autoComplete="off" autoFocus aria-label={`Type ${expected} to confirm deletion`} /></label>
+        </>}
+      <div>
+        <button type="button" className="dhl-admin-button" onClick={onClose} disabled={busy}>Cancel</button>
+        <button type="submit" className="dhl-admin-button danger-solid" disabled={blocked}>{busy ? 'Deleting…' : 'Delete Shipment'}</button>
+      </div>
+    </form>
+  </div>;
+}
+
 function ActionDialog({ action, shipment, onClose, onDone }: { action: LifecycleAction; shipment: ShipmentWithCheckpoints; onClose: () => void; onDone: (done: Done) => void }) {
   const rule = actionRules[action];
   const [reason, setReason] = useState(action === 'pause' ? PAUSE_REASONS[0] : '');
@@ -99,6 +135,7 @@ export default function AdminShipmentDetail() {
   const [dialog, setDialog] = useState<LifecycleAction | null>(null);
   const [done, setDone] = useState<Done | null>(null);
   const [receiptOpen, setReceiptOpen] = useState(params.get('receipt') === '1');
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [notice, setNotice] = useState(params.get('created') ? 'Shipment created and scheduled. Publish it when you are ready to issue the tracking number.' : params.get('saved') ? 'Changes saved.' : '');
   const [history, setHistory] = useState<HistoryRow[]>([]);
   const [update, setUpdate] = useState<{ title: string; location: string; point: RoutePoint | null }>({ title: '', location: '', point: null });
@@ -151,10 +188,9 @@ export default function AdminShipmentDetail() {
     catch (cause) { setProgressMessage(cause instanceof Error ? cause.message : 'Route progress could not be saved.'); }
   };
   const remove = async () => {
-    if (!window.confirm('Delete this shipment? It disappears from lists and public tracking. Its history is kept for audit.')) return;
     setDeleting(true);
     try { await softDeleteShipment(shipment.id); navigate('/admin/shipments', { replace: true }); }
-    catch (cause) { setNotice(cause instanceof Error ? cause.message : 'The shipment could not be deleted.'); setDeleting(false); }
+    catch (cause) { setDeleteOpen(false); setNotice(cause instanceof Error ? cause.message : 'The shipment could not be deleted.'); setDeleting(false); }
   };
 
   return <div className="dhl-admin-shipment-detail dhl-control">
@@ -190,7 +226,7 @@ export default function AdminShipmentDetail() {
         <button type="button" className="dhl-admin-button" onClick={() => setReceiptOpen(true)}><FileText size={15} />View Receipt</button>
         {secondary.map(action => <button key={action} type="button" className={`dhl-admin-button${actionRules[action].tone === 'danger' ? ' danger' : ''}`} onClick={() => setDialog(action)}>{actionRules[action].label}</button>)}
         {published && <Link className="dhl-admin-button" to={`/admin/chat?tracking=${encodeURIComponent(shipment.id)}`}><MessageCircle size={15} />Contact Customer</Link>}
-        {canSoftDelete(state) && <button type="button" className="dhl-admin-button danger" onClick={() => void remove()} disabled={deleting}><Trash2 size={15} />{deleting ? 'Deleting…' : 'Delete'}</button>}
+        {canSoftDelete(state) && <button type="button" className="dhl-admin-button danger" onClick={() => setDeleteOpen(true)} disabled={deleting}><Trash2 size={15} />{deleting ? 'Deleting…' : 'Delete Shipment'}</button>}
       </div>
     </section>
 
@@ -276,5 +312,6 @@ export default function AdminShipmentDetail() {
 
     {dialog && <ActionDialog action={dialog} shipment={shipment} onClose={() => setDialog(null)} onDone={result => { setDialog(null); setDone(result); setNotice(''); }} />}
     {receiptOpen && <ShipmentReceipt shipment={(done?.published || shipment) as Shipment} onClose={() => setReceiptOpen(false)} />}
+    {deleteOpen && <DeleteShipmentDialog shipment={shipment} busy={deleting} onClose={() => setDeleteOpen(false)} onConfirm={() => void remove()} />}
   </div>;
 }
